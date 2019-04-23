@@ -1,2 +1,3 @@
-import numpy as np
-df = np.read_csv('./datasets/sider.csv')
+import pandas as pd
+df = pd.read_csv('./datasets/sider.csv')
+print(df)

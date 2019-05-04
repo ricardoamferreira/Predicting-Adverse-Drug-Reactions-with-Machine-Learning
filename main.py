@@ -3,7 +3,7 @@ from rdkit import Chem
 import create_fingerprints as cf
 
 
-def create_original_df():
+def create_original_df(write=False):
     global df, df_molecules
     # Create dataframe from csv
     df = pd.read_csv("./datasets/sider.csv")
@@ -15,7 +15,8 @@ def create_original_df():
     df_molecules["mols"] = df_molecules["smiles"].apply(Chem.MolFromSmiles)
 
     #Write to csv
-    #df_molecules.to_csv("./datasets/df_molecules.csv")
+    if write:
+        df_molecules.to_csv("./datasets/df_molecules.csv")
 
 
 def createfingerprints():
@@ -32,7 +33,7 @@ def createfingerprints():
 
 
 if __name__ == "__main__":
-    create_original_df()
+    create_original_df(write=False)
     createfingerprints()
     #print(df_molecules)
     #print(ecfp_df)

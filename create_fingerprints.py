@@ -25,6 +25,16 @@ def get_maccs_with_try(molecule):
     return maccs
 
 
+def get_atompairs_with_try(molecule):
+    try:
+        atompairs = rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(molecule)
+    except Exception as e:
+        print(e)
+        print("error" + str(molecule))
+        atompairs = np.nan
+    return atompairs
+
+
 def create_ecfp4_fingerprint(df_molecules, write=False):
     # Morgan Fingerprint (ECFP4)
     df_molecules["ECFP4"] = df_molecules["mols"].apply(get_morgan_with_try).apply(to_numpyarray_to_list)
@@ -53,3 +63,18 @@ def create_maccs_fingerprint(df_molecules, write=False):
         maccs_df.to_csv("./datasets/maccs.csv")
 
     return maccs_df
+
+
+def create_atompairs_fingerprint(df_molecules, write=False):
+    # ATOM PAIRS
+    df_molecules["ATOMPAIRS"] = df_molecules["mols"].apply(get_atompairs_with_try).apply(to_numpyarray_to_list)
+
+    # New DF with one column for each ATOM PAIRS key
+    atom_pairs_df = df_molecules['ATOMPAIRS'].apply(pd.Series)
+    atom_pairs_df = atom_pairs_df.rename(columns=lambda x: 'ATOMPAIR_' + str(x + 1))
+
+    # Write to csv
+    if write:
+        atom_pairs_df.to_csv("./datasets/atom_pairs.csv")
+
+    return atom_pairs_df

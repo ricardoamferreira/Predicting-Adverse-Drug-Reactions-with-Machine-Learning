@@ -1,0 +1,50 @@
+TODO Fingerprints (1ds for each)
+Atom Pairs (done)
+Topological Torsions
+MACCS Keys (done)
+Morgan (done)
+2D Pharmacophore
+Pattern
+Extern Reduced Graphs
+
+TODO Descriptors (All in 1 ds? Maybe)
+Gasteiger/Marsili Partial Charges
+BalabanJ
+BertzCT
+Ipc
+HallKierAlpha
+Kappa1 - Kappa3
+Chi0, Chi1
+Chi0n - Chi4n
+Chi0v - Chi4v
+MolLogP
+MolMR
+MolWt
+ExactMolWt
+HeavyAtomCount
+HeavyAtomMolWt
+NHOHCount
+NOCount
+NumHAcceptors
+NumHDonors
+NumHeteroatoms
+NumRotatableBonds
+NumValenceElectrons
+NumAmideBonds
+Num{Aromatic,Saturated,Aliphatic}Rings
+Num{Aromatic,Saturated,Aliphatic}{Hetero,Carbo}cycles
+RingCount
+FractionCSP3
+NumSpiroAtoms
+NumBridgeheadAtoms
+TPSA
+LabuteASA
+PEOE_VSA1 - PEOE_VSA14
+SMR_VSA1 - SMR_VSA10
+SlogP_VSA1 - SlogP_VSA12
+EState_VSA1 - EState_VSA11
+VSA_EState1 - VSA_EState10
+MQNs
+Topliss fragments
+Autocorr2D
+

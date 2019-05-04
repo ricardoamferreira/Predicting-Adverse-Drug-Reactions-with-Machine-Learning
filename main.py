@@ -13,7 +13,7 @@ def create_original_df():
 
     # Converting to molecules
     df_molecules["mols"] = df_molecules["smiles"].apply(Chem.MolFromSmiles)
-    # df_molecules.to_csv("./datasets/df_molecules")
+    df_molecules.to_csv("./datasets/df_molecules.csv")
 
 
 def createfingerprints():
@@ -31,8 +31,8 @@ def createfingerprints():
 
 if __name__ == "__main__":
     create_original_df()
-    createfingerprints()
-    print(df_molecules)
-    print(ecfp_df)
-    print(maccs_df)
-    print(atom_pairs_df)
+    #createfingerprints()
+    #print(df_molecules)
+    #print(ecfp_df)
+    #print(maccs_df)
+    #print(atom_pairs_df)

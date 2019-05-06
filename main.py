@@ -40,7 +40,7 @@ def createdescriptors():
     global df_mols_desc
 
     #Descriptors
-    df_mols_desc = cd.calc_descriptors(df_molecules, True)
+    df_mols_desc = cd.calc_descriptors(df_molecules, False)
 
 
 

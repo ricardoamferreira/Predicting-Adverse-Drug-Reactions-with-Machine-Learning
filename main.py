@@ -5,7 +5,7 @@ import create_descriptors as cd
 from rdkit import Chem
 from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV, train_test_split, cross_validate
-from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, matthews_corrcoef
+from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, confusion_matrix
 from sklearn.feature_selection import SelectKBest, f_classif
 
 
@@ -52,7 +52,7 @@ def createdescriptors():
 
 
 df, df_molecules = create_original_df(write=False)
-ecfp_df, maccs_df, atom_pairs_df, tt_df = createfingerprints(512)
+
 df_mols_desc = createdescriptors()
 
 
@@ -61,19 +61,42 @@ df_mols_desc = createdescriptors()
 seed = 6 # um número qualquer
 np.random.seed(seed)
 
+
 #Split into X and Y vars
-X = ecfp_df.copy()
-#X = pd.concat([ecfp_df, df_mols_desc], axis=1)
+#X = ecfp_df.copy()
 y = df["Hepatobiliary disorders"].copy()
+scoring_metrics = ["f1"]
 
-estimator = SVC(gamma = 0.1)
-scoring_metrics = ['roc_auc', 'accuracy', 'precision', 'recall']
+sizes = np.linspace(100, 2048, 20)
 
-cv_scores = cross_validate(estimator, X, y, scoring=scoring_metrics, cv = 10, return_train_score=False)
-for k, v in cv_scores.items():
-    if k != "fit_time" and k != "score_time":
-        print("Métrica: %s" % k)
-        print("Resultados de cada fold: %s" % v)  # resultados de cada fold
-        print("Média de todas as folds: %s" % np.mean(v))
-        print("Desvio padrão: %s" % np.std(v))
+results = np.zeros([4, len(sizes)])
+
+c = 0
+r = 0
+
+for s in sizes:
+    print(f"Doing size {int(s)}")
+    fingerprints = createfingerprints(int(s))
+    r = 0
+    for fp in fingerprints:
+        X = fp.copy()
+        y = df["Hepatobiliary disorders"].copy()
+
+        cv_scores = cross_validate(SVC(gamma = "auto"), X, y, cv=10, scoring=scoring_metrics, return_train_score= False)
+
+
+        for k, v in cv_scores.items():
+            if k != "fit_time" and k != "score_time":
+                results[r, c] = v.mean()
+        r += 1
+    c += 1
+
+print(results)
+
+
+
+
+
+
+
 

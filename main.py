@@ -73,7 +73,7 @@ results = np.zeros([4, len(sizes)])
 
 c = 0
 r = 0
-
+#Size testing
 for s in sizes:
     print(f"Doing size {int(s)}")
     fingerprints = createfingerprints(int(s))

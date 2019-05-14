@@ -4,10 +4,10 @@ from aux_functions import to_numpyarray_to_list
 from rdkit.Chem import rdMolDescriptors
 
 
-def get_morgan(molecule):
+def get_morgan(molecule, length=512):
     try:
         # radius=2 = ECFP4, radius=3 = ECFP6, etc.
-        desc = rdMolDescriptors.GetMorganFingerprintAsBitVect(molecule, 2, 1024)
+        desc = rdMolDescriptors.GetMorganFingerprintAsBitVect(molecule, 2, nBits=length)
     except Exception as e:
         print(e)
         print('error ' + str(molecule))
@@ -18,6 +18,7 @@ def get_morgan(molecule):
 def get_maccs(molecule):
     try:
         maccs = rdMolDescriptors.GetMACCSKeysFingerprint(molecule)
+        # Does not have length
     except Exception as e:
         print(e)
         print("error" + str(molecule))
@@ -25,9 +26,9 @@ def get_maccs(molecule):
     return maccs
 
 
-def get_atompairs(molecule):
+def get_atompairs(molecule, length=512):
     try:
-        atompairs = rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(molecule)
+        atompairs = rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(molecule, nBits=length)
     except Exception as e:
         print(e)
         print("error" + str(molecule))
@@ -35,9 +36,9 @@ def get_atompairs(molecule):
     return atompairs
 
 
-def get_topological_torsion(molecule):
+def get_topological_torsion(molecule, length=512):
     try:
-        tt = rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(molecule)
+        tt = rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(molecule, nBits=length)
     except Exception as e:
         print(e)
         print("error" + str(molecule))
@@ -45,9 +46,9 @@ def get_topological_torsion(molecule):
     return tt
 
 
-def create_ecfp4_fingerprint(df_molecules, write=False):
+def create_ecfp4_fingerprint(df_molecules, length=512, write=False):
     # Morgan Fingerprint (ECFP4)
-    df_molecules["ECFP4"] = df_molecules["mols"].apply(get_morgan).apply(to_numpyarray_to_list)
+    df_molecules["ECFP4"] = df_molecules["mols"].apply(lambda x: get_morgan(x, length)).apply(to_numpyarray_to_list)
 
     # New DF with one column for each ECFP bit
     ecfp_df = df_molecules['ECFP4'].apply(pd.Series)
@@ -75,9 +76,10 @@ def create_maccs_fingerprint(df_molecules, write=False):
     return maccs_df
 
 
-def create_atompairs_fingerprint(df_molecules, write=False):
+def create_atompairs_fingerprint(df_molecules, length=512, write=False):
     # ATOM PAIRS
-    df_molecules["ATOMPAIRS"] = df_molecules["mols"].apply(get_atompairs).apply(to_numpyarray_to_list)
+    df_molecules["ATOMPAIRS"] = df_molecules["mols"].apply(lambda x: get_atompairs(x, length)).apply(
+        to_numpyarray_to_list)
 
     # New DF with one column for each ATOM PAIRS key
     atom_pairs_df = df_molecules['ATOMPAIRS'].apply(pd.Series)
@@ -90,9 +92,9 @@ def create_atompairs_fingerprint(df_molecules, write=False):
     return atom_pairs_df
 
 
-def create_topological_torsion_fingerprint(df_molecules, write=False):
+def create_topological_torsion_fingerprint(df_molecules, length=512, write=False):
     # Topological Torsion
-    df_molecules["TT"] = df_molecules["mols"].apply(get_atompairs).apply(to_numpyarray_to_list)
+    df_molecules["TT"] = df_molecules["mols"].apply(lambda x: get_atompairs(x, length)).apply(to_numpyarray_to_list)
 
     # New DF with one column for each Topological torsion key
     tt_df = df_molecules['TT'].apply(pd.Series)

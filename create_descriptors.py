@@ -39,8 +39,9 @@ def calc_descriptors(df_molecules, write=False):
     df_mols_desc["numsatrings"] = df_mols_desc["mols"].apply(Lipinski.NumSaturatedRings)
     df_mols_desc["ringcount"] = df_mols_desc["mols"].apply(Lipinski.RingCount)
 
-
-
+    #Drop SMILES and MOLS
+    columns = ["smiles", "mols"]
+    df_mols_desc.drop(columns, inplace=True, axis=1)
 
 
     #Fill NaN with 0

@@ -6,9 +6,9 @@ from rdkit import Chem
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, train_test_split, cross_validate
+from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
 
 def create_original_df(write=False):
     # Create dataframe from csv
@@ -28,8 +28,6 @@ def create_original_df(write=False):
 
 
 def createfingerprints(length):
-    global ecfp_df, maccs_df, atom_pairs_df, tt_df
-
     # Morgan Fingerprint (ECFP4)
     ecfp_df = cf.create_ecfp4_fingerprint(df_molecules, length, False)
 
@@ -133,6 +131,9 @@ def test_fingerprint_size(model, num_sizes_to_test=20, min_size=100, max_size=20
 
     return all_df_results
 
+#def test_descriptors(funcscore=f_classif, k=10, write = False):
+
+
 
 # fixing the seed
 seed = 6
@@ -142,6 +143,21 @@ np.random.seed(seed)
 df, df_molecules = create_original_df(write=False)
 df_mols_desc = createdescriptors()
 
+
+
+
+
 # Machine learning process
 #all_df_results_svc = test_fingerprint_size(SVC(gamma="scale"), makeplots=True, write=True) #Best result with ECFP-4 at 1535
 #all_df_results_rf = test_fingerprint_size(RandomForestClassifier(100), makeplots=True, write=True) #Best result with ECFP-4 at 1535
+y = df["Hepatobiliary disorders"].copy()
+X, _, _, _ = createfingerprints(length=1535)
+#Train, true test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+params_to_test = {"kernel":["linear","rbf"], "C":[1, 10, 100, 1000], "gamma":[1,0.1,0.001,0.0001]}
+
+grid_search = GridSearchCV(SVC(), params_to_test, cv=10, n_jobs=-1, verbose=True, scoring="f1")
+grid_search.fit(X_train, y_train)
+#C: 10, gamma:0.1, rbf
+

@@ -5,8 +5,10 @@ import create_descriptors as cd
 from rdkit import Chem
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV, train_test_split, cross_validate
+from sklearn.model_selection import GridSearchCV, train_test_split, cross_validate, RandomizedSearchCV
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
+from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, precision_recall_curve
+
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -141,13 +143,37 @@ def select_best_descriptors(X, y, funcscore=f_classif, k=10):
     return X_new_df
 
 
-def grid_search(X, y, model, params_to_test, cv=cv, scoring="f1", verbose=False):
+def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, scoring="f1", verbose=False):
     # Define grid search
     grid_search = GridSearchCV(model, params_to_test, cv=cv, n_jobs=-1, verbose=verbose, scoring=scoring)
+
     # Fit X and y to test parameters
-    grid_search.fit(X, y)
+    grid_search.fit(X_train, y_train)
+
     # Print best parameters
+    print()
+    print("Best parameters set found:")
     print(grid_search.best_params_)
+    print()
+
+    # Print scores
+    print()
+    print("Score for development set:")
+    means = grid_search.cv_results_["mean_test_score"]
+    stds = grid_search.cv_results_["std_test_score"]
+    for mean, std, params in zip(means, stds, grid_search.cv_results_["params"]):
+        print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
+    print()
+
+    # Detailed Classification report
+    print()
+    print("Detailed classification report:")
+    print("The model is trained on the full development set.")
+    print("The scores are computed on the full evaluation set.")
+    print()
+    y_true, y_pred = y_test, grid_search.predict(X_test)
+    print(classification_report(y_true, y_pred))
+    print()
     # Save best estimator
     best_estimator = grid_search.best_estimator_
     # And return it
@@ -168,9 +194,11 @@ df_mols_desc = createdescriptors()
 # all_df_results_rf = test_fingerprint_size(RandomForestClassifier(100), makeplots=True, write=True) #Best result with ECFP-4 at 1535
 
 # Results vector
+print("Creating results vector")
 y = df["Hepatobiliary disorders"].copy()
 
 # Feature vector
+print("Creating feature dataframe")
 X, _, _, _ = createfingerprints(length=1535)
 x_descriptors = select_best_descriptors(df_mols_desc, y, funcscore=f_classif, k=10)
 X = pd.concat([X, x_descriptors], axis=1)
@@ -178,6 +206,23 @@ X = pd.concat([X, x_descriptors], axis=1)
 # Train, true test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-#Test SVC parameters
-params_to_test = {"kernel": ["linear", "rbf"], "C": [0.1, 1, 10, 100, 1000], "gamma": [1, 0.1, 0.001, 0.0001]}
-best_svc = grid_search(X_train, y_train, params_to_test, cv=10, scoring="f1", verbose=True)
+# Test SVC parameters
+print("Test best SVC")
+params_to_test = {"kernel": ["linear", "rbf"], "C": [1, 10, 100, 1000], "gamma": [1, 0.1, 0.001, 0.0001]}
+best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(), params_to_test, cv=10, scoring="f1", verbose=True)
+'''
+# Test RF
+n_estimators = [int(x) for x in np.linspace(100, 2000, 20, dtype=int)]
+max_features = ["auto", "sqrt"]
+max_depth = [int(x) for x in np.linspace(10, 110, 11, dtype=int)]
+max_depth.append(None)
+min_samples_split = [2, 5, 10]
+min_samples_leaf = [1,2,4]
+bootstrap = [True, False]
+random_grid = {'n_estimators': n_estimators,
+               'max_features': max_features,
+               'max_depth': max_depth,
+               'min_samples_split': min_samples_split,
+               'min_samples_leaf': min_samples_leaf,
+               'bootstrap': bootstrap}
+'''

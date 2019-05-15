@@ -94,7 +94,7 @@ def create_atompairs_fingerprint(df_molecules, length=512, write=False):
 
 def create_topological_torsion_fingerprint(df_molecules, length=512, write=False):
     # Topological Torsion
-    df_molecules["TT"] = df_molecules["mols"].apply(lambda x: get_atompairs(x, length)).apply(to_numpyarray_to_list)
+    df_molecules["TT"] = df_molecules["mols"].apply(lambda x: get_topological_torsion(x, length)).apply(to_numpyarray_to_list)
 
     # New DF with one column for each Topological torsion key
     tt_df = df_molecules['TT'].apply(pd.Series)

@@ -7,6 +7,7 @@ from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV, train_test_split, cross_validate
 from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, confusion_matrix
 from sklearn.feature_selection import SelectKBest, f_classif
+import matplotlib.pyplot as plt
 
 
 def create_original_df(write=False):
@@ -65,11 +66,15 @@ np.random.seed(seed)
 #Split into X and Y vars
 #X = ecfp_df.copy()
 y = df["Hepatobiliary disorders"].copy()
-scoring_metrics = ["f1"]
+scoring_metrics = ["roc_auc", "precision", "recall", "accuracy"]
 
-sizes = np.linspace(100, 2048, 20)
+sizes = np.linspace(100, 2048, 20, dtype=int)
 
-results = np.zeros([4, len(sizes)])
+results_rocauc = np.zeros([4, len(sizes)])
+results_precision = np.zeros([4, len(sizes)])
+results_recall = np.zeros([4, len(sizes)])
+results_accuracy = np.zeros([4, len(sizes)])
+
 
 c = 0
 r = 0
@@ -82,16 +87,45 @@ for s in sizes:
         X = fp.copy()
         y = df["Hepatobiliary disorders"].copy()
 
-        cv_scores = cross_validate(SVC(gamma = "auto"), X, y, cv=10, scoring=scoring_metrics, return_train_score= False)
+        cv_scores = cross_validate(SVC(gamma = "scale"), X, y, cv=10, scoring=scoring_metrics, return_train_score= False)
 
 
         for k, v in cv_scores.items():
-            if k != "fit_time" and k != "score_time":
-                results[r, c] = v.mean()
+            if k == "test_roc_auc":
+                results_rocauc[r, c] = v.mean()
+            if k == "test_precision":
+                results_precision[r, c] = v.mean()
+            if k == "test_recall":
+                results_recall[r, c] = v.mean()
+            if k == "test_accuracy":
+                results_accuracy[r, c] = v.mean()
         r += 1
     c += 1
 
-print(results)
+
+df_results_rocauc_size_SVC = pd.DataFrame(results_rocauc, columns=sizes)
+df_results_precision_size_SVC = pd.DataFrame(results_precision, columns=sizes)
+df_results_recall_size_SVC = pd.DataFrame(results_recall, columns=sizes)
+df_results_accuracy_size_SVC = pd.DataFrame(results_accuracy, columns=sizes)
+
+df_results_rocauc_size_SVC.to_csv("./results/df_results_rocauc_size_SVC")
+df_results_precision_size_SVC.to_csv("./results/df_results_precision_size_SVC")
+df_results_recall_size_SVC.to_csv("./results/df_results_recall_size_SVC")
+df_results_accuracy_size_SVC.to_csv("./results/df_results_accuracy_size_SVC")
+
+
+
+plt.clf()
+fig = plt.figure(figsize=(10,10))
+fp_names = ["ecfp","maccs","atom pairs","tt"]
+for i in range(len(fingerprints)):
+    plt.plot(sizes, results_precision[i,:], "-")
+plt.title("SVM, ROC-AUC vs fingerprint length",fontsize=25)
+plt.ylabel("ROC-AUC", fontsize = 20)
+plt.xlabel("ROC-AUC", fontsize = 20)
+plt.legend(fp_names, fontsize = 15)
+plt.ylim([0,1])
+plt.show()
 
 
 

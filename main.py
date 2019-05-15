@@ -111,7 +111,7 @@ def test_fingerprint_size(model, num_sizes_to_test=20, min_size=100, max_size=20
     # Save to file
     if write:
         df_results_rocauc_size_SVC.to_csv("./results/df_results_rocauc_size_SVC.csv")
-        df_results_precision_size_SVC.to_csv("./results/df_results_precision_size_SVC..csv")
+        df_results_precision_size_SVC.to_csv("./results/df_results_precision_size_SVC.csv")
         df_results_recall_size_SVC.to_csv("./results/df_results_recall_size_SVC.csv")
         df_results_accuracy_size_SVC.to_csv("./results/df_results_accuracy_size_SVC.csv")
         df_results_f1_size_SVC.to_csv("./results/df_results_f1_size_SVC.csv")

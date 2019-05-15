@@ -10,6 +10,7 @@ from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classi
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+
 def create_original_df(write=False):
     # Create dataframe from csv
     df = pd.read_csv("./datasets/sider.csv")
@@ -103,8 +104,9 @@ def test_fingerprint_size(model, num_sizes_to_test=20, min_size=100, max_size=20
     df_results_f1_size_SVC = pd.DataFrame(results_f1, columns=sizes)
 
     all_df_results = (
-    df_results_rocauc_size_SVC, df_results_precision_size_SVC, df_results_recall_size_SVC, df_results_accuracy_size_SVC,
-    df_results_f1_size_SVC)
+        df_results_rocauc_size_SVC, df_results_precision_size_SVC, df_results_recall_size_SVC,
+        df_results_accuracy_size_SVC,
+        df_results_f1_size_SVC)
 
     # Save to file
     if write:
@@ -131,8 +133,25 @@ def test_fingerprint_size(model, num_sizes_to_test=20, min_size=100, max_size=20
 
     return all_df_results
 
-#def test_descriptors(funcscore=f_classif, k=10, write = False):
 
+def select_best_descriptors(X, y, funcscore=f_classif, k=10):
+    # Select k highest scoring feature from X to y with a score function, f_classif by defatult
+    X_new = SelectKBest(score_func=funcscore, k=k).fit_transform(X, y)
+    X_new_df = pd.DataFrame(X_new)
+    return X_new_df
+
+
+def grid_search(X, y, model, params_to_test, cv=cv, scoring="f1", verbose=False):
+    # Define grid search
+    grid_search = GridSearchCV(model, params_to_test, cv=cv, n_jobs=-1, verbose=verbose, scoring=scoring)
+    # Fit X and y to test parameters
+    grid_search.fit(X, y)
+    # Print best parameters
+    print(grid_search.best_params_)
+    # Save best estimator
+    best_estimator = grid_search.best_estimator_
+    # And return it
+    return best_estimator
 
 
 # fixing the seed
@@ -143,21 +162,22 @@ np.random.seed(seed)
 df, df_molecules = create_original_df(write=False)
 df_mols_desc = createdescriptors()
 
-
-
-
-
 # Machine learning process
-#all_df_results_svc = test_fingerprint_size(SVC(gamma="scale"), makeplots=True, write=True) #Best result with ECFP-4 at 1535
-#all_df_results_rf = test_fingerprint_size(RandomForestClassifier(100), makeplots=True, write=True) #Best result with ECFP-4 at 1535
+# Fingerprint length
+# all_df_results_svc = test_fingerprint_size(SVC(gamma="scale"), makeplots=True, write=True) #Best result with ECFP-4 at 1535
+# all_df_results_rf = test_fingerprint_size(RandomForestClassifier(100), makeplots=True, write=True) #Best result with ECFP-4 at 1535
+
+# Results vector
 y = df["Hepatobiliary disorders"].copy()
+
+# Feature vector
 X, _, _, _ = createfingerprints(length=1535)
-#Train, true test split
+x_descriptors = select_best_descriptors(df_mols_desc, y, funcscore=f_classif, k=10)
+X = pd.concat([X, x_descriptors], axis=1)
+
+# Train, true test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-params_to_test = {"kernel":["linear","rbf"], "C":[1, 10, 100, 1000], "gamma":[1,0.1,0.001,0.0001]}
-
-grid_search = GridSearchCV(SVC(), params_to_test, cv=10, n_jobs=-1, verbose=True, scoring="f1")
-grid_search.fit(X_train, y_train)
-#C: 10, gamma:0.1, rbf
-
+#Test SVC parameters
+params_to_test = {"kernel": ["linear", "rbf"], "C": [0.1, 1, 10, 100, 1000], "gamma": [1, 0.1, 0.001, 0.0001]}
+best_svc = grid_search(X_train, y_train, params_to_test, cv=10, scoring="f1", verbose=True)

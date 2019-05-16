@@ -3,7 +3,7 @@ from rdkit.Chem import Descriptors, Lipinski
 
 def calc_descriptors(df_molecules, write=False):
     # Make a copy of the molecule dataframe
-    df_mols_desc = df_molecules.iloc[:, 0:2].copy()
+    df_mols_desc = df_molecules.copy()
 
     # Create the descriptors (12)
     df_mols_desc["molweight"] = df_mols_desc["mols"].apply(Descriptors.ExactMolWt)
@@ -40,8 +40,7 @@ def calc_descriptors(df_molecules, write=False):
     df_mols_desc["ringcount"] = df_mols_desc["mols"].apply(Lipinski.RingCount)
 
     #Drop SMILES and MOLS
-    columns = ["smiles", "mols"]
-    df_mols_desc.drop(columns, inplace=True, axis=1)
+    df_mols_desc.drop("mols", inplace=True, axis=1)
 
 
     #Fill NaN with 0

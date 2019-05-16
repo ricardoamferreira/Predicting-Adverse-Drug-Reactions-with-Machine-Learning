@@ -8,7 +8,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, train_test_split, cross_validate, RandomizedSearchCV
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, precision_recall_curve
-
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -23,37 +22,41 @@ def create_original_df(write=False):
     # Converting to molecules
     df_molecules["mols"] = df_molecules["smiles"].apply(Chem.MolFromSmiles)
 
+    # Droping mols and smiles
+    df_y = df.drop("smiles", axis=1)
+
     # Write to csv
     if write:
         df_molecules.to_csv("./dataframes/df_molecules.csv")
+        df_y.to_csv("./dataframes/df_y.csv")
 
-    return df, df_molecules
+    return df_y, df_molecules
 
 
-def createfingerprints(length):
+def createfingerprints(df_mols, length):
     # Morgan Fingerprint (ECFP4)
-    ecfp_df = cf.create_ecfp4_fingerprint(df_molecules, length, False)
+    ecfp_df = cf.create_ecfp4_fingerprint(df_mols, length, False)
 
     # MACCS keys (always 167)
-    maccs_df = cf.create_maccs_fingerprint(df_molecules, False)
+    maccs_df = cf.create_maccs_fingerprint(df_mols, False)
 
     # ATOM PAIRS
-    atom_pairs_df = cf.create_atompairs_fingerprint(df_molecules, length, False)
+    atom_pairs_df = cf.create_atompairs_fingerprint(df_mols, length, False)
 
     # Topological torsion
-    tt_df = cf.create_topological_torsion_fingerprint(df_molecules, length, False)
+    tt_df = cf.create_topological_torsion_fingerprint(df_mols, length, False)
 
     return ecfp_df, maccs_df, atom_pairs_df, tt_df
 
 
-def createdescriptors():
+def createdescriptors(df_molecules):
     # Descriptors
     df_mols_desc = cd.calc_descriptors(df_molecules, False)
 
     return df_mols_desc
 
 
-def test_fingerprint_size(model, num_sizes_to_test=20, min_size=100, max_size=2048, cv=10, makeplots=False,
+def test_fingerprint_size(df_mols, df_y, model, num_sizes_to_test=20, min_size=100, max_size=2048, cv=10, makeplots=False,
                           write=False):
     # Fingerprint length type and selection
     # Scoring metrics to use
@@ -72,12 +75,12 @@ def test_fingerprint_size(model, num_sizes_to_test=20, min_size=100, max_size=20
     # Size testing using SVC with scale gamma (1 / (n_features * X.var()))
     for s in tqdm(sizes):
         # Create fingerprint with size S
-        fingerprints = createfingerprints(int(s))
+        fingerprints = createfingerprints(df_mols, int(s))
         r = 0
         for fp in fingerprints:
             X = fp.copy()
             # Using "Hepatobiliary disorders" as an results example since its balanced
-            y = df["Hepatobiliary disorders"].copy()
+            y = df_y["Hepatobiliary disorders"].copy()
             # 10-fold cross validation
             cv_scores = cross_validate(model, X, y, cv=cv, scoring=scoring_metrics,
                                        return_train_score=False, n_jobs=-1)
@@ -174,45 +177,62 @@ def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, 
     y_true, y_pred = y_test, grid_search.predict(X_test)
     print(classification_report(y_true, y_pred))
     print()
+    print("Confusion Matrix as")
+    print("""
+    TN FP
+    FN TP
+    """)
+    print(confusion_matrix(y_true, y_pred))
     # Save best estimator
     best_estimator = grid_search.best_estimator_
     # And return it
     return best_estimator
 
 
-# fixing the seed
+#Process
+# Fixing the seed
 seed = 6
 np.random.seed(seed)
 
-# Create base DF
-df, df_molecules = create_original_df(write=False)
-df_mols_desc = createdescriptors()
+# Creating base df_molecules, df_y with the results vectors, and df_mols_descr with the descriptors
+df_y, df_molecules = create_original_df(write=False)
+df_molecules.drop("smiles", axis=1, inplace=True)
+
 
 # Machine learning process
+# Separating in a DF_mols_train and an Df_mols_test, in order to avoid data snooping and fitting the model to the test
+df_mols_train, df_mols_test, all_y_train, all_y_test = train_test_split(df_molecules, df_y, test_size=0.2, random_state=seed)
+
 # Fingerprint length
-# all_df_results_svc = test_fingerprint_size(SVC(gamma="scale"), makeplots=True, write=True) #Best result with ECFP-4 at 1535
-# all_df_results_rf = test_fingerprint_size(RandomForestClassifier(100), makeplots=True, write=True) #Best result with ECFP-4 at 1535
+#all_df_results_svc = test_fingerprint_size(df_mols_train, all_y_train, SVC(gamma="scale", random_state=seed), makeplots=True, write=True)
+#Best result with ECFP-4 at 1125
 
-# Results vector
-print("Creating results vector")
-y = df["Hepatobiliary disorders"].copy()
 
-# Feature vector
-print("Creating feature dataframe")
-X, _, _, _ = createfingerprints(length=1535)
-x_descriptors = select_best_descriptors(df_mols_desc, y, funcscore=f_classif, k=10)
-X = pd.concat([X, x_descriptors], axis=1)
+# Creating dataframes
+print("Creating dataframes")
+X_all, _, _, _ = createfingerprints(df_molecules, length=1125)
+X_train, _, _, _ = createfingerprints(df_mols_train, length=1125)
+X_test, _, _, _ = createfingerprints(df_mols_test, length=1125)
+y_all = df_y["Hepatobiliary disorders"].copy()
+y_train = all_y_train["Hepatobiliary disorders"].copy()
+y_test = all_y_test["Hepatobiliary disorders"].copy()
+df_desc = createdescriptors(df_molecules)
 
-# Train, true test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+X_descriptors = select_best_descriptors(df_desc, y_all, funcscore=f_classif, k=10)
+df_desc_train, df_desc_test = train_test_split(X_descriptors, test_size=0.2, random_state=seed)
+
+X_train = pd.concat([X_train, df_desc_train], axis=1)
+X_test = pd.concat([X_test, df_desc_test], axis=1)
+
 
 # Test SVC parameters
 print("Test best SVC")
 params_to_test = {"kernel": ["linear", "rbf"], "C": [1, 10, 100, 1000], "gamma": [1, 0.1, 0.001, 0.0001]}
-best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(), params_to_test, cv=10, scoring="f1", verbose=True)
+best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(random_state=seed), params_to_test, cv=10, scoring="f1", verbose=True)
+
 '''
 # Test RF
-n_estimators = [int(x) for x in np.linspace(100, 2000, 20, dtype=int)]
+n_estimators = [int(x) for x in np.linspace(10, 1000, 20, dtype=int)]
 max_features = ["auto", "sqrt"]
 max_depth = [int(x) for x in np.linspace(10, 110, 11, dtype=int)]
 max_depth.append(None)

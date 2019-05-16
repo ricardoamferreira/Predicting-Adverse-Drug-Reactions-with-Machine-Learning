@@ -48,10 +48,11 @@ def get_topological_torsion(molecule, length=512):
 
 def create_ecfp4_fingerprint(df_molecules, length=512, write=False):
     # Morgan Fingerprint (ECFP4)
-    df_molecules["ECFP4"] = df_molecules["mols"].apply(lambda x: get_morgan(x, length)).apply(to_numpyarray_to_list)
+    df_w = df_molecules.copy()
+    df_w["ECFP4"] = df_w["mols"].apply(lambda x: get_morgan(x, length)).apply(to_numpyarray_to_list)
 
     # New DF with one column for each ECFP bit
-    ecfp_df = df_molecules['ECFP4'].apply(pd.Series)
+    ecfp_df = df_w['ECFP4'].apply(pd.Series)
     ecfp_df = ecfp_df.rename(columns=lambda x: 'ECFP4_' + str(x + 1))
 
     # Write to csv
@@ -63,10 +64,11 @@ def create_ecfp4_fingerprint(df_molecules, length=512, write=False):
 
 def create_maccs_fingerprint(df_molecules, write=False):
     # MACCS keys
-    df_molecules["MACCS"] = df_molecules["mols"].apply(get_maccs).apply(to_numpyarray_to_list)
+    df_w = df_molecules.copy()
+    df_w["MACCS"] = df_w["mols"].apply(get_maccs).apply(to_numpyarray_to_list)
 
     # New DF with one column for each MACCS key
-    maccs_df = df_molecules['MACCS'].apply(pd.Series)
+    maccs_df = df_w['MACCS'].apply(pd.Series)
     maccs_df = maccs_df.rename(columns=lambda x: 'MACCS_' + str(x + 1))
 
     # Write to csv
@@ -78,11 +80,12 @@ def create_maccs_fingerprint(df_molecules, write=False):
 
 def create_atompairs_fingerprint(df_molecules, length=512, write=False):
     # ATOM PAIRS
-    df_molecules["ATOMPAIRS"] = df_molecules["mols"].apply(lambda x: get_atompairs(x, length)).apply(
+    df_w = df_molecules.copy()
+    df_w["ATOMPAIRS"] = df_w["mols"].apply(lambda x: get_atompairs(x, length)).apply(
         to_numpyarray_to_list)
 
     # New DF with one column for each ATOM PAIRS key
-    atom_pairs_df = df_molecules['ATOMPAIRS'].apply(pd.Series)
+    atom_pairs_df = df_w['ATOMPAIRS'].apply(pd.Series)
     atom_pairs_df = atom_pairs_df.rename(columns=lambda x: 'ATOMPAIR_' + str(x + 1))
 
     # Write to csv
@@ -94,10 +97,11 @@ def create_atompairs_fingerprint(df_molecules, length=512, write=False):
 
 def create_topological_torsion_fingerprint(df_molecules, length=512, write=False):
     # Topological Torsion
-    df_molecules["TT"] = df_molecules["mols"].apply(lambda x: get_topological_torsion(x, length)).apply(to_numpyarray_to_list)
+    df_w = df_molecules.copy()
+    df_w["TT"] = df_w["mols"].apply(lambda x: get_topological_torsion(x, length)).apply(to_numpyarray_to_list)
 
     # New DF with one column for each Topological torsion key
-    tt_df = df_molecules['TT'].apply(pd.Series)
+    tt_df = df_w['TT'].apply(pd.Series)
     tt_df = tt_df.rename(columns=lambda x: 'TT' + str(x + 1))
 
     # Write to csv

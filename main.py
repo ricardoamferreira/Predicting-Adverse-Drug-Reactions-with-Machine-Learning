@@ -9,6 +9,7 @@ from sklearn.model_selection import GridSearchCV, train_test_split, cross_valida
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, precision_recall_curve
 import matplotlib.pyplot as plt
+import xgboost as xgb
 from tqdm import tqdm
 
 
@@ -139,25 +140,19 @@ def test_fingerprint_size(df_mols, df_y, model, num_sizes_to_test=20, min_size=1
     return all_df_results
 
 
-def select_best_descriptors(X, y, funcscore=f_classif, k=10):
+def select_best_descriptors(X, y, funcscore=f_classif, k=2):
     # Select k highest scoring feature from X to y with a score function, f_classif by defatult
     X_new = SelectKBest(score_func=funcscore, k=k).fit_transform(X, y)
     X_new_df = pd.DataFrame(X_new)
     return X_new_df
 
 
-def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, scoring="f1", verbose=False):
+def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, scoring="f1", n_jobs=-1, verbose=False):
     # Define grid search
-    grid_search = GridSearchCV(model, params_to_test, cv=cv, n_jobs=-1, verbose=verbose, scoring=scoring)
+    grid_search = GridSearchCV(model, params_to_test, cv=cv, n_jobs=n_jobs, verbose=verbose, scoring=scoring)
 
     # Fit X and y to test parameters
     grid_search.fit(X_train, y_train)
-
-    # Print best parameters
-    print()
-    print("Best parameters set found:")
-    print(grid_search.best_params_)
-    print()
 
     # Print scores
     print()
@@ -166,6 +161,12 @@ def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, 
     stds = grid_search.cv_results_["std_test_score"]
     for mean, std, params in zip(means, stds, grid_search.cv_results_["params"]):
         print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
+    print()
+
+    # Print best parameters
+    print()
+    print("Best parameters set found:")
+    print(grid_search.best_params_)
     print()
 
     # Detailed Classification report
@@ -187,6 +188,52 @@ def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, 
     best_estimator = grid_search.best_estimator_
     # And return it
     return best_estimator
+
+
+def random_search(X_train, X_test, y_train, y_test, model, grid, n_iter=100, cv=10, scoring="f1", n_jobs = -1, verbose=False):
+    # Define random search
+    rs = RandomizedSearchCV(model,grid,n_iter=n_iter, cv=cv, scoring=scoring,n_jobs=n_jobs,verbose=verbose)
+
+    # Fit parameters
+    rs.fit(X_train, y_train)
+
+    # Print scores
+    print()
+    print("Score for development set:")
+    means = rs.cv_results_["mean_test_score"]
+    stds = rs.cv_results_["std_test_score"]
+    for mean, std, params in zip(means, stds, rs.cv_results_["params"]):
+        print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
+    print()
+
+    # Print best parameters
+    print()
+    print("Best parameters set found:")
+    print(rs.best_params_)
+    print()
+
+    # Detailed Classification report
+    print()
+    print("Detailed classification report:")
+    print("The model is trained on the full development set.")
+    print("The scores are computed on the full evaluation set.")
+    print()
+    y_true, y_pred = y_test, rs.predict(X_test)
+    print(classification_report(y_true, y_pred))
+    print()
+    print("Confusion Matrix as")
+    print("""
+       TN FP
+       FN TP
+       """)
+    print(confusion_matrix(y_true, y_pred))
+    # Save best estimator
+    best_estimator = rs.best_estimator_
+    # And return it
+    return best_estimator
+
+
+
 
 
 #Process
@@ -218,7 +265,7 @@ y_train = all_y_train["Hepatobiliary disorders"].copy()
 y_test = all_y_test["Hepatobiliary disorders"].copy()
 df_desc = createdescriptors(df_molecules)
 
-X_descriptors = select_best_descriptors(df_desc, y_all, funcscore=f_classif, k=10)
+X_descriptors = select_best_descriptors(df_desc, y_all, funcscore=f_classif, k=4)
 df_desc_train, df_desc_test = train_test_split(X_descriptors, test_size=0.2, random_state=seed)
 
 X_train = pd.concat([X_train, df_desc_train], axis=1)
@@ -226,23 +273,33 @@ X_test = pd.concat([X_test, df_desc_test], axis=1)
 
 
 # Test SVC parameters
-print("Test best SVC")
-params_to_test = {"kernel": ["linear", "rbf"], "C": [1, 10, 100, 1000], "gamma": [1, 0.1, 0.001, 0.0001]}
-best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(random_state=seed), params_to_test, cv=10, scoring="f1", verbose=True)
+#print("Test best SVC")
+#params_to_test = {"kernel": ["linear", "rbf"], "C": [1, 10, 100], "gamma": [1, 0.1, 0.001]}
+#best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(random_state=seed), params_to_test, cv=10, scoring="f1", verbose=True)
+#{'C': 10, 'gamma': 0.1, 'kernel': 'rbf'}
 
-'''
+
 # Test RF
-n_estimators = [int(x) for x in np.linspace(10, 1000, 20, dtype=int)]
-max_features = ["auto", "sqrt"]
-max_depth = [int(x) for x in np.linspace(10, 110, 11, dtype=int)]
-max_depth.append(None)
-min_samples_split = [2, 5, 10]
-min_samples_leaf = [1,2,4]
-bootstrap = [True, False]
+print("Test best RF")
+#n_estimators = [int(x) for x in np.linspace(750, 850, 6, dtype=int)]
+n_estimators = [820, 830, 840]
+max_features = ["log2", "sqrt"]
+#max_depth = [int(x) for x in np.linspace(100, 180, 8, dtype=int)]
+max_depth = [90, 100, 110]
+min_samples_split = [11, 12, 13]
+min_samples_leaf = [1, 2]
+bootstrap = [True]
+
 random_grid = {'n_estimators': n_estimators,
                'max_features': max_features,
                'max_depth': max_depth,
                'min_samples_split': min_samples_split,
                'min_samples_leaf': min_samples_leaf,
                'bootstrap': bootstrap}
-'''
+
+#best_random_rf = random_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), grid=random_grid, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
+
+
+best_rf = grid_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), random_grid, cv=3, scoring="f1", n_jobs=-2, verbose=True)
+#6th {'bootstrap': True, 'max_depth': 100, 'max_features': 'log2', 'min_samples_leaf': 1, 'min_samples_split': 12, 'n_estimators': 830}
+

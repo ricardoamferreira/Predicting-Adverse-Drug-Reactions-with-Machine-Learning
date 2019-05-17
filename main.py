@@ -295,11 +295,11 @@ def cv_report(estimator, X_train, y_train, cv=10, scoring_metrics=("f1", "roc_au
 
     print()
     print("Individual metrics")
-    print(f"F1 Score: Mean: {f1_s:.2f} (Std: {f1_std:.2})")
-    print(f"ROC-AUC score: Mean: {auc_s:.2f} (Std: {auc_std:.2})")
-    print(f"Recall score: Mean: {rec_s:.2f} (Std: {rec_std:.2})")
-    print(f"Precision score: Mean: {prec_s:.2f} (Std: {prec_std:.2})")
-    print(f"Accuracy score: Mean: {acc_s:.2f} (Std: {acc_std:.2})")
+    print(f"F1 Score: Mean: {f1_s:.3f} (Std: {f1_std:.3f})")
+    print(f"ROC-AUC score: Mean: {auc_s:.3f} (Std: {auc_std:.3f})")
+    print(f"Recall score: Mean: {rec_s:.3f} (Std: {rec_std:.3f})")
+    print(f"Precision score: Mean: {prec_s:.3f} (Std: {prec_std:.3f})")
+    print(f"Accuracy score: Mean: {acc_s:.3f} (Std: {acc_std:.3f})")
     print()
 
 
@@ -333,7 +333,7 @@ y_train = all_y_train["Hepatobiliary disorders"].copy()
 y_test = all_y_test["Hepatobiliary disorders"].copy()
 df_desc = createdescriptors(df_molecules)
 
-X_descriptors = select_best_descriptors(df_desc, y_all, funcscore=f_classif, k=4)
+X_descriptors = select_best_descriptors(df_desc, y_all, funcscore=f_classif, k=2)
 df_desc_train, df_desc_test = train_test_split(X_descriptors, test_size=0.2, random_state=seed)
 
 X_train = pd.concat([X_train, df_desc_train], axis=1)
@@ -348,8 +348,8 @@ score_report(base_svc, X_test, y_test)
 
 # Test SVC parameters
 # print("Test best SVC")
-# params_to_test = {"kernel": ["linear", "rbf"], "C": [1, 10, 100], "gamma": [1, 0.1, 0.001]}
-# best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(random_state=seed), params_to_test, cv=10, scoring="f1", verbose=True, n_jobs=-2)
+params_to_test = {"kernel": ["linear", "rbf"], "C": [1, 10, 100], "gamma": [1, 0.1, 0.001]}
+best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(random_state=seed), params_to_test, cv=10, scoring="f1", verbose=True, n_jobs=-2)
 # {'C': 10, 'gamma': 0.1, 'kernel': 'rbf'}
 
 print()
@@ -357,6 +357,34 @@ print("Improved SVC Parameters")
 impr_svc = SVC(C=10, kernel="rbf", gamma=0.1, random_state=seed)
 impr_svc.fit(X_train, y_train)
 score_report(impr_svc, X_test, y_test)
+'''
+print()
+print("Testing number of descriptors besides fingerprint")
+X_all, _, _, _ = createfingerprints(df_molecules, length=1125)
+X_train, _, _, _ = createfingerprints(df_mols_train, length=1125)
+X_test, _, _, _ = createfingerprints(df_mols_test, length=1125)
+y_all = df_y["Hepatobiliary disorders"].copy()
+y_train = all_y_train["Hepatobiliary disorders"].copy()
+y_test = all_y_test["Hepatobiliary disorders"].copy()
+df_desc = createdescriptors(df_molecules)
+
+for i in range(0, 5, 1):
+    X_descriptors = select_best_descriptors(de_desc, y_all, funcscore=f_classif, k=i)
+    df_desc_train, df_desc_test = train_test_split(X_descriptors, test_size=0.2, random_state=seed)
+
+    X_train_desc = pd.concat([X_train, df_desc_train], axis=1)
+    X_test_desc = pd.concat([X_test, df_desc_test], axis=1)
+
+    print(f"Scores for size {i}")
+    impr_svc = SVC(C=10, kernel="rbf", gamma=0.1, random_state=seed)
+    cv_report(impr_svc, X_train_desc, y_train)
+'''
+#Best score with 2
+
+#Repeated test to otimize hyperparameters of SVC - same results
+
+
+
 
 # Test RF
 # print("Test best RF")
@@ -379,8 +407,8 @@ random_grid = {'n_estimators': n_estimators,
 # best_random_rf = random_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), grid=random_grid, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
 
 
-# best_rf = grid_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), random_grid, cv=3, scoring="f1", n_jobs=-2, verbose=True)
-# 6th {'bootstrap': True, 'max_depth': 100, 'max_features': 'log2', 'min_samples_leaf': 1, 'min_samples_split': 12, 'n_estimators': 830}
+best_rf = grid_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), random_grid, cv=3, scoring="f1", n_jobs=-2, verbose=True)
+# 6th {'bootstrap': True, 'max_depth': 100, 'max_features': 'log2', 'min_samples_leaf': 1, 'min_samples_split': 11, 'n_estimators': 820}
 
 # Test XGbBoost
 

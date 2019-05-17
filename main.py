@@ -7,7 +7,9 @@ from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, train_test_split, cross_validate, RandomizedSearchCV
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
-from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, precision_recall_curve
+from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, \
+    accuracy_score, roc_auc_score
+from sklearn.preprocessing import scale
 import matplotlib.pyplot as plt
 import xgboost as xgb
 from tqdm import tqdm
@@ -57,7 +59,8 @@ def createdescriptors(df_molecules):
     return df_mols_desc
 
 
-def test_fingerprint_size(df_mols, df_y, model, num_sizes_to_test=20, min_size=100, max_size=2048, cv=10, makeplots=False,
+def test_fingerprint_size(df_mols, df_y, model, num_sizes_to_test=20, min_size=100, max_size=2048, cv=10,
+                          makeplots=False,
                           write=False):
     # Fingerprint length type and selection
     # Scoring metrics to use
@@ -160,7 +163,7 @@ def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, 
     means = grid_search.cv_results_["mean_test_score"]
     stds = grid_search.cv_results_["std_test_score"]
     for mean, std, params in zip(means, stds, grid_search.cv_results_["params"]):
-        print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
+        print("%0.3f (+/-%0.03f) for %r" % (mean, std * 1.96, params))
     print()
 
     # Print best parameters
@@ -190,9 +193,10 @@ def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, 
     return best_estimator
 
 
-def random_search(X_train, X_test, y_train, y_test, model, grid, n_iter=100, cv=10, scoring="f1", n_jobs = -1, verbose=False):
+def random_search(X_train, X_test, y_train, y_test, model, grid, n_iter=100, cv=10, scoring="f1", n_jobs=-1,
+                  verbose=False):
     # Define random search
-    rs = RandomizedSearchCV(model,grid,n_iter=n_iter, cv=cv, scoring=scoring,n_jobs=n_jobs,verbose=verbose)
+    rs = RandomizedSearchCV(model, grid, n_iter=n_iter, cv=cv, scoring=scoring, n_jobs=n_jobs, verbose=verbose)
 
     # Fit parameters
     rs.fit(X_train, y_train)
@@ -203,7 +207,7 @@ def random_search(X_train, X_test, y_train, y_test, model, grid, n_iter=100, cv=
     means = rs.cv_results_["mean_test_score"]
     stds = rs.cv_results_["std_test_score"]
     for mean, std, params in zip(means, stds, rs.cv_results_["params"]):
-        print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
+        print("%0.3f (+/-%0.03f) for %r" % (mean, std * 1.96, params))
     print()
 
     # Print best parameters
@@ -233,10 +237,73 @@ def random_search(X_train, X_test, y_train, y_test, model, grid, n_iter=100, cv=
     return best_estimator
 
 
+def score_report(estimator, X_test, y_test):
+    # Predicting value
+    y_true, y_pred = y_test, estimator.predict(X_test)
+
+    # Detailed Classification report
+    print()
+    print("The scores are computed on the full evaluation set")
+    print("These are not used to train or optimize the model")
+    print()
+    print("Detailed classification report:")
+    print(classification_report(y_true, y_pred))
+    print()
+    print("Confusion matrix as:")
+    print("""
+           TN FP
+           FN TP
+           """)
+    print(confusion_matrix(y_true, y_pred))
+    print()
+
+    # Individual metrics
+    f1 = f1_score(y_true, y_pred)
+    auc = roc_auc_score(y_true, y_pred)
+    rec = recall_score(y_true, y_pred)
+    prec = precision_score(y_true, y_pred)
+    acc = accuracy_score(y_true, y_pred)
+
+    print("Individual metrics:")
+    print(f"F1 score: {f1:.2f}")
+    print(f"ROC-AUC score: {auc:.2f}")
+    print(f"Recall score: {rec:.2f}")
+    print(f"Precision score: {prec:.2f}")
+    print(f"Accuracy score: {acc:.2f}")
+    print()
 
 
+def cv_report(estimator, X_train, y_train, cv=10, scoring_metrics=("f1", "roc_auc", "recall", "precision", "accuracy"),
+              n_jobs=-1, verbose=False):
+    # Cross validation
+    scores = cross_validate(estimator, X_train, y_train, scoring=scoring_metrics, cv=cv, n_jobs=n_jobs, verbose=verbose,
+                            return_train_score=False)
 
-#Process
+    # Means
+    f1_s = np.mean(scores["test_f1"])
+    auc_s = np.mean(scores["test_roc_auc"])
+    rec_s = np.mean(scores["test_recall"])
+    prec_s = np.mean(scores["test_precision"])
+    acc_s = np.mean(scores["test_accuracy"])
+
+    # STD
+    f1_std = np.std(scores["test_f1"])
+    auc_std = np.std(scores["test_roc_auc"])
+    rec_std = np.std(scores["test_recall"])
+    prec_std = np.std(scores["test_precision"])
+    acc_std = np.std(scores["test_accuracy"])
+
+    print()
+    print("Individual metrics")
+    print(f"F1 Score: Mean: {f1_s:.2f} (Std: {f1_std:.2})")
+    print(f"ROC-AUC score: Mean: {auc_s:.2f} (Std: {auc_std:.2})")
+    print(f"Recall score: Mean: {rec_s:.2f} (Std: {rec_std:.2})")
+    print(f"Precision score: Mean: {prec_s:.2f} (Std: {prec_std:.2})")
+    print(f"Accuracy score: Mean: {acc_s:.2f} (Std: {acc_std:.2})")
+    print()
+
+
+# Process
 # Fixing the seed
 seed = 6
 np.random.seed(seed)
@@ -245,14 +312,15 @@ np.random.seed(seed)
 df_y, df_molecules = create_original_df(write=False)
 df_molecules.drop("smiles", axis=1, inplace=True)
 
-
 # Machine learning process
 # Separating in a DF_mols_train and an Df_mols_test, in order to avoid data snooping and fitting the model to the test
-df_mols_train, df_mols_test, all_y_train, all_y_test = train_test_split(df_molecules, df_y, test_size=0.2, random_state=seed)
+df_mols_train, df_mols_test, all_y_train, all_y_test = train_test_split(df_molecules, df_y, test_size=0.2,
+                                                                        random_state=seed)
 
 # Fingerprint length
-#all_df_results_svc = test_fingerprint_size(df_mols_train, all_y_train, SVC(gamma="scale", random_state=seed), makeplots=True, write=True)
-#Best result with ECFP-4 at 1125
+# all_df_results_svc = test_fingerprint_size(df_mols_train, all_y_train, SVC(gamma="scale", random_state=seed),
+#                                            makeplots=True, write=True)
+# Best result with ECFP-4 at 1125
 
 
 # Creating dataframes
@@ -271,20 +339,31 @@ df_desc_train, df_desc_test = train_test_split(X_descriptors, test_size=0.2, ran
 X_train = pd.concat([X_train, df_desc_train], axis=1)
 X_test = pd.concat([X_test, df_desc_test], axis=1)
 
+# SVC
+print()
+print("Base SVC:")
+base_svc = SVC(gamma="auto", random_state=seed)
+base_svc.fit(X_train, y_train)
+score_report(base_svc, X_test, y_test)
 
 # Test SVC parameters
-#print("Test best SVC")
-#params_to_test = {"kernel": ["linear", "rbf"], "C": [1, 10, 100], "gamma": [1, 0.1, 0.001]}
-#best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(random_state=seed), params_to_test, cv=10, scoring="f1", verbose=True)
-#{'C': 10, 'gamma': 0.1, 'kernel': 'rbf'}
+# print("Test best SVC")
+# params_to_test = {"kernel": ["linear", "rbf"], "C": [1, 10, 100], "gamma": [1, 0.1, 0.001]}
+# best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(random_state=seed), params_to_test, cv=10, scoring="f1", verbose=True, n_jobs=-2)
+# {'C': 10, 'gamma': 0.1, 'kernel': 'rbf'}
 
+print()
+print("Improved SVC Parameters")
+impr_svc = SVC(C=10, kernel="rbf", gamma=0.1, random_state=seed)
+impr_svc.fit(X_train, y_train)
+score_report(impr_svc, X_test, y_test)
 
 # Test RF
-print("Test best RF")
-#n_estimators = [int(x) for x in np.linspace(750, 850, 6, dtype=int)]
+# print("Test best RF")
+# n_estimators = [int(x) for x in np.linspace(750, 850, 6, dtype=int)]
 n_estimators = [820, 830, 840]
 max_features = ["log2", "sqrt"]
-#max_depth = [int(x) for x in np.linspace(100, 180, 8, dtype=int)]
+# max_depth = [int(x) for x in np.linspace(100, 180, 8, dtype=int)]
 max_depth = [90, 100, 110]
 min_samples_split = [11, 12, 13]
 min_samples_leaf = [1, 2]
@@ -297,9 +376,16 @@ random_grid = {'n_estimators': n_estimators,
                'min_samples_leaf': min_samples_leaf,
                'bootstrap': bootstrap}
 
-#best_random_rf = random_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), grid=random_grid, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
+# best_random_rf = random_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), grid=random_grid, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
 
 
-best_rf = grid_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), random_grid, cv=3, scoring="f1", n_jobs=-2, verbose=True)
-#6th {'bootstrap': True, 'max_depth': 100, 'max_features': 'log2', 'min_samples_leaf': 1, 'min_samples_split': 12, 'n_estimators': 830}
+# best_rf = grid_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), random_grid, cv=3, scoring="f1", n_jobs=-2, verbose=True)
+# 6th {'bootstrap': True, 'max_depth': 100, 'max_features': 'log2', 'min_samples_leaf': 1, 'min_samples_split': 12, 'n_estimators': 830}
 
+# Test XGbBoost
+
+xgb_model = xgb.XGBClassifier(objective="binary:logistic", random_state=seed)
+xgb_model.fit(X_train, y_train)
+y_pred = xgb_model.predict(X_test)
+print(confusion_matrix(y_test, y_pred))
+print(f1_score(y_test, y_pred))

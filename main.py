@@ -342,20 +342,19 @@ X_test = pd.concat([X_test, df_desc_test], axis=1)
 # SVC
 print()
 print("Base SVC:")
-base_svc = SVC(gamma="auto", random_state=seed)
-base_svc.fit(X_train, y_train)
+base_svc = SVC(gamma="auto", random_state=seed).fit(X_train, y_train)
 score_report(base_svc, X_test, y_test)
 
 # Test SVC parameters
 # print("Test best SVC")
 params_to_test = {"kernel": ["linear", "rbf"], "C": [1, 10, 100], "gamma": [1, 0.1, 0.001]}
-best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(random_state=seed), params_to_test, cv=10, scoring="f1", verbose=True, n_jobs=-2)
+best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(random_state=seed), params_to_test, cv=10, scoring="f1",
+                       verbose=True, n_jobs=-2)
 # {'C': 10, 'gamma': 0.1, 'kernel': 'rbf'}
 
 print()
 print("Improved SVC Parameters")
-impr_svc = SVC(C=10, kernel="rbf", gamma=0.1, random_state=seed)
-impr_svc.fit(X_train, y_train)
+impr_svc = SVC(C=10, kernel="rbf", gamma=0.1, random_state=seed).fit(X_train, y_train)
 score_report(impr_svc, X_test, y_test)
 '''
 print()
@@ -379,22 +378,29 @@ for i in range(0, 5, 1):
     impr_svc = SVC(C=10, kernel="rbf", gamma=0.1, random_state=seed)
     cv_report(impr_svc, X_train_desc, y_train)
 '''
-#Best score with 2
-
-#Repeated test to otimize hyperparameters of SVC - same results
-
-
+# Best score with 2
+# Repeated test to otimize hyperparameters of SVC - same results
 
 
 # Test RF
-# print("Test best RF")
-# n_estimators = [int(x) for x in np.linspace(750, 850, 6, dtype=int)]
-n_estimators = [820, 830, 840]
-max_features = ["log2", "sqrt"]
-# max_depth = [int(x) for x in np.linspace(100, 180, 8, dtype=int)]
-max_depth = [90, 100, 110]
-min_samples_split = [11, 12, 13]
-min_samples_leaf = [1, 2]
+print()
+print("Base RF:")
+base_rf = RandomForestClassifier(random_state=seed).fit(X_train, y_train)
+score_report(base_rf, X_test, y_test)
+# F1 score: 0.66
+# ROC-AUC score: 0.66
+# Recall score: 0.63
+# Precision score: 0.70
+# Accuracy score: 0.66
+
+print("Random Search RF")
+# n_estimators = [int(x) for x in np.linspace(500, 1000, 10, dtype=int)]
+n_estimators = [720, 740, 760, 780, 800, 820, 840]
+max_features = ["log2"]
+# max_depth = [int(x) for x in np.linspace(50, 300, 10, dtype=int)]
+max_depth = [70, 80, 90, 100, 110]
+min_samples_split = [9, 10, 11, 12]
+min_samples_leaf = [1]
 bootstrap = [True]
 
 random_grid = {'n_estimators': n_estimators,
@@ -404,16 +410,57 @@ random_grid = {'n_estimators': n_estimators,
                'min_samples_leaf': min_samples_leaf,
                'bootstrap': bootstrap}
 
-# best_random_rf = random_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), grid=random_grid, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
+best_random_rf = random_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed),
+                               grid=random_grid, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
 
+best_rf = grid_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), random_grid, cv=3,
+                      scoring="f1", n_jobs=-2, verbose=True)
+# {'bootstrap': True, 'max_depth': 110, 'max_features': 'log2', 'min_samples_leaf': 1, 'min_samples_split': 10, 'n_estimators': 800}
 
-best_rf = grid_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), random_grid, cv=3, scoring="f1", n_jobs=-2, verbose=True)
-# 6th {'bootstrap': True, 'max_depth': 100, 'max_features': 'log2', 'min_samples_leaf': 1, 'min_samples_split': 11, 'n_estimators': 820}
+print()
+print("Improved SVC Parameters")
+impr_rf = RandomForestClassifier(bootstrap=True, max_depth=110, max_features="log2", min_samples_leaf=1,
+                                 min_samples_split=10, n_estimators=800, random_state=seed).fit(X_train, y_train)
+score_report(impr_rf, X_test, y_test)
 
 # Test XGbBoost
+print()
+print("Base XGBoost:")
+base_xgb = xgb.XGBClassifier(objective="binary:logistic", random_state=seed).fit(X_train, y_train)
+y_pred = base_xgb.predict(X_test)
+score_report(base_xgb, X_test, y_test)
 
-xgb_model = xgb.XGBClassifier(objective="binary:logistic", random_state=seed)
-xgb_model.fit(X_train, y_train)
-y_pred = xgb_model.predict(X_test)
-print(confusion_matrix(y_test, y_pred))
-print(f1_score(y_test, y_pred))
+eta = [0.05, 0.1, 0.2, 0.3]
+min_child_weight = [1, 3, 5]
+max_depth = [3, 6, 9, 12]
+gamma = [0, 0.2, 0.4]
+subsample = [0.1, 0.5, 1]
+colsample_bytree = [0.1, 0.5, 1]
+params = {'eta': eta,
+          'min_child_weight': min_child_weight,
+          'max_depth': max_depth,
+          'gamma': gamma,
+          'subsample': subsample,
+          'colsample_bytree': colsample_bytree
+          }
+best_random_xgb = random_search(X_train, X_test, y_train, y_test, xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
+                               grid=params, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
+#{'subsample': 1, 'min_child_weight': 1, 'max_depth': 12, 'gamma': 0, 'eta': 0.1, 'colsample_bytree': 0.1}
+eta = [0.03, 0.04, 0.05]
+min_child_weight = [5, 6,7]
+max_depth = [7, 8, 9]
+gamma = [0.1, 0.2, 0.3]
+subsample = [0.8]
+colsample_bytree = [0.3]
+params_grid = {'eta': eta,
+          'min_child_weight': min_child_weight,
+          'max_depth': max_depth,
+          'gamma': gamma,
+          'subsample': subsample,
+          'colsample_bytree': colsample_bytree
+          }
+
+best_rf = grid_search(X_train, X_test, y_train, y_test, xgb.XGBClassifier(objective="binary:logistic", random_state=seed), params_grid, cv=5,
+                      scoring="f1", n_jobs=-2, verbose=True)
+#{'colsample_bytree': 0.3, 'eta': 0.05, 'gamma': 0.3, 'max_depth': 9, 'min_child_weight': 5, 'subsample': 0.8}
+#{'colsample_bytree': 0.3, 'eta': 0.04, 'gamma': 0.2, 'max_depth': 8, 'min_child_weight': 6, 'subsample': 0.8}

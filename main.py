@@ -6,7 +6,7 @@ from rdkit import Chem
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, train_test_split, cross_validate, RandomizedSearchCV
-from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
+from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif, RFECV
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, \
     accuracy_score, roc_auc_score
 from sklearn.multioutput import MultiOutputClassifier
@@ -144,11 +144,20 @@ def test_fingerprint_size(df_mols, df_y, model, num_sizes_to_test=20, min_size=1
     return all_df_results
 
 
-def select_best_descriptors(X, y, funcscore=f_classif, k=2):
-    # Select k highest scoring feature from X to y with a score function, f_classif by defatult
-    X_new = SelectKBest(score_func=funcscore, k=k).fit_transform(X, y)
-    X_new_df = pd.DataFrame(X_new)
-    return X_new_df
+def select_best_descriptors(df_desc, y_all, out_names=[], score_func=f_classif, k=1):
+    # Select k highest scoring feature from X to every y and return new df with only the selected ones
+    if not out_names:
+        print("Column names necessary")
+        return None
+    selected = []
+    for n in out_names:
+        skb = SelectKBest(score_func=score_func, k=k).fit(df_desc, y_all[n])
+        n_sel_bol = skb.get_support()
+        sel = df_desc.loc[:, n_sel_bol].columns.to_list()
+        for s in sel:
+            if s not in selected:
+                selected.append(s)
+    return selected
 
 
 def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, scoring="f1", n_jobs=-1, verbose=False):
@@ -226,12 +235,15 @@ def random_search(X_train, X_test, y_train, y_test, model, grid, n_iter=100, cv=
     y_true, y_pred = y_test, rs.predict(X_test)
     print(classification_report(y_true, y_pred))
     print()
-    print("Confusion Matrix as")
-    print("""
-       TN FP
-       FN TP
-       """)
+    """
+    print("Confusion matrix as:")
+    print(
+           TN FP
+           FN TP
+           )
     print(confusion_matrix(y_true, y_pred))
+    print()
+    """
     # Save best estimator
     best_estimator = rs.best_estimator_
     # And return it
@@ -250,19 +262,20 @@ def score_report(estimator, X_test, y_test):
     print("Detailed classification report:")
     print(classification_report(y_true, y_pred))
     print()
+    """
     print("Confusion matrix as:")
-    print("""
-           TN FP
-           FN TP
-           """)
+    print(
+           #TN FP
+           #FN TP
+           )
     print(confusion_matrix(y_true, y_pred))
     print()
-
+    """
     # Individual metrics
-    f1 = f1_score(y_true, y_pred)
-    auc = roc_auc_score(y_true, y_pred)
-    rec = recall_score(y_true, y_pred)
-    prec = precision_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred, average="macro")
+    auc = roc_auc_score(y_true, y_pred, average="macro")
+    rec = recall_score(y_true, y_pred, average="macro")
+    prec = precision_score(y_true, y_pred, average="macro")
     acc = accuracy_score(y_true, y_pred)
 
     print("Individual metrics:")
@@ -274,24 +287,25 @@ def score_report(estimator, X_test, y_test):
     print()
 
 
-def cv_report(estimator, X_train, y_train, cv=10, scoring_metrics=("f1", "roc_auc", "recall", "precision", "accuracy"),
+def cv_report(estimator, X_train, y_train, cv=10,
+              scoring_metrics=("f1_macro", "roc_auc", "recall_macro", "precision_macro", "accuracy"),
               n_jobs=-1, verbose=False):
     # Cross validation
     scores = cross_validate(estimator, X_train, y_train, scoring=scoring_metrics, cv=cv, n_jobs=n_jobs, verbose=verbose,
                             return_train_score=False)
 
     # Means
-    f1_s = np.mean(scores["test_f1"])
+    f1_s = np.mean(scores["test_f1_macro"])
     auc_s = np.mean(scores["test_roc_auc"])
-    rec_s = np.mean(scores["test_recall"])
-    prec_s = np.mean(scores["test_precision"])
+    rec_s = np.mean(scores["test_recall_macro"])
+    prec_s = np.mean(scores["test_precision_macro"])
     acc_s = np.mean(scores["test_accuracy"])
 
     # STD
-    f1_std = np.std(scores["test_f1"])
+    f1_std = np.std(scores["test_f1_macro"])
     auc_std = np.std(scores["test_roc_auc"])
-    rec_std = np.std(scores["test_recall"])
-    prec_std = np.std(scores["test_precision"])
+    rec_std = np.std(scores["test_recall_macro"])
+    prec_std = np.std(scores["test_precision_macro"])
     acc_std = np.std(scores["test_accuracy"])
 
     print()
@@ -310,35 +324,54 @@ seed = 6
 np.random.seed(seed)
 
 # Creating base df_molecules, df_y with the results vectors, and df_mols_descr with the descriptors
-df_y, df_molecules = create_original_df(write=False)
+y_all, df_molecules = create_original_df(write=False)
 df_molecules.drop("smiles", axis=1, inplace=True)
+y_all.drop("Product issues", axis=1, inplace=True)
 
 # Machine learning process
 # Separating in a DF_mols_train and an Df_mols_test, in order to avoid data snooping and fitting the model to the test
-df_mols_train, df_mols_test, all_y_train, all_y_test = train_test_split(df_molecules, df_y, test_size=0.2,
-                                                                        random_state=seed)
+df_mols_train, df_mols_test, y_train, y_test = train_test_split(df_molecules, y_all, test_size=0.2, random_state=seed)
 
 # Fingerprint length
 # all_df_results_svc = test_fingerprint_size(df_mols_train, all_y_train, SVC(gamma="scale", random_state=seed),
-#                                            makeplots=True, write=True)
+#                                            makeplots=False, write=False)
 # Best result with ECFP-4 at 1125
 
 
 # Creating dataframes
-print("Creating dataframes")
+print("Creating Dataframes")
+# Create X datasets
 X_all, _, _, _ = createfingerprints(df_molecules, length=1125)
 X_train, _, _, _ = createfingerprints(df_mols_train, length=1125)
 X_test, _, _, _ = createfingerprints(df_mols_test, length=1125)
-y_all = df_y["Hepatobiliary disorders"].copy()
-y_train = all_y_train["Hepatobiliary disorders"].copy()
-y_test = all_y_test["Hepatobiliary disorders"].copy()
-df_desc = createdescriptors(df_molecules)
-y_all_train, y_all_test = train_test_split(df_y, test_size=0.2, random_state=seed)
-X_descriptors = select_best_descriptors(df_desc, y_all, funcscore=f_classif, k=2)
-df_desc_train, df_desc_test = train_test_split(X_descriptors, test_size=0.2, random_state=seed)
 
+# Selecting and creating descriptors dataset
+df_desc = createdescriptors(df_molecules)  # Create all descriptors
+# Split in train and test
+df_desc_base_train, df_desc_base_test = train_test_split(df_desc, test_size=0.2, random_state=seed)
+out_names = y_all.columns.tolist()  # Get descriptors names
+# Get list with selected descriptors for every Y
+selected = select_best_descriptors(df_desc_base_train, y_train, out_names=out_names, score_func=f_classif, k=3)
+df_desc_train = df_desc_base_train.loc[:, selected].copy()  # Get train dataframe with only selected columns
+df_desc_test = df_desc_base_test.loc[:, selected].copy()  # Get test dataframe with only selected columns
+
+# Join descriptors with fingerprint dataframe
 X_train = pd.concat([X_train, df_desc_train], axis=1)
 X_test = pd.concat([X_test, df_desc_test], axis=1)
+
+# SVC
+scoring_metrics=("f1_macro", "roc_auc", "recall_macro", "precision_macro", "accuracy")
+print()
+print("Base Multi Output SVC:")
+base_svc = SVC(gamma="auto", random_state=seed)
+multi_target_SVC_base = MultiOutputClassifier(base_svc, n_jobs=-2)
+#cv_report(multi_target_SVC_base, X_train, y_train, cv=10, scoring_metrics=scoring_metrics, n_jobs=-2, verbose=True)
+multi_target_SVC_base.fit(X_train, y_train)
+print(classification_report(y_train, multi_target_SVC_base.predict(X_train)))
+
+
+
+
 
 # SVC
 print()
@@ -351,13 +384,13 @@ score_report(base_svc, X_test, y_test)
 params_to_test = {"kernel": ["linear", "rbf"], "C": [1, 10, 100], "gamma": [1, 0.1, 0.001]}
 best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(random_state=seed), params_to_test, cv=10, scoring="f1",
                        verbose=True, n_jobs=-2)
-# {'C': 10, 'gamma': 0.1, 'kernel': 'rbf'}
+# {"C": 10, "gamma": 0.1, "kernel": "rbf"}
 
 print()
 print("Improved SVC Parameters")
 impr_svc = SVC(C=10, kernel="rbf", gamma=0.1, random_state=seed).fit(X_train, y_train)
 score_report(impr_svc, X_test, y_test)
-'''
+"""
 print()
 print("Testing number of descriptors besides fingerprint")
 X_all, _, _, _ = createfingerprints(df_molecules, length=1125)
@@ -378,7 +411,7 @@ for i in range(0, 5, 1):
     print(f"Scores for size {i}")
     impr_svc = SVC(C=10, kernel="rbf", gamma=0.1, random_state=seed)
     cv_report(impr_svc, X_train_desc, y_train)
-'''
+"""
 # Best score with 2
 # Repeated test to otimize hyperparameters of SVC - same results
 
@@ -404,30 +437,25 @@ min_samples_split = [9, 10, 11, 12]
 min_samples_leaf = [1]
 bootstrap = [True]
 
-random_grid = {'n_estimators': n_estimators,
-               'max_features': max_features,
-               'max_depth': max_depth,
-               'min_samples_split': min_samples_split,
-               'min_samples_leaf': min_samples_leaf,
-               'bootstrap': bootstrap}
+random_grid = {"n_estimators": n_estimators,
+               "max_features": max_features,
+               "max_depth": max_depth,
+               "min_samples_split": min_samples_split,
+               "min_samples_leaf": min_samples_leaf,
+               "bootstrap": bootstrap}
 
 best_random_rf = random_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed),
                                grid=random_grid, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
 
 best_rf = grid_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), random_grid, cv=3,
                       scoring="f1", n_jobs=-2, verbose=True)
-# {'bootstrap': True, 'max_depth': 110, 'max_features': 'log2', 'min_samples_leaf': 1, 'min_samples_split': 10, 'n_estimators': 800}
+# {"bootstrap": True, "max_depth": 110, "max_features": "log2", "min_samples_leaf": 1, "min_samples_split": 10, "n_estimators": 800}
 
 print()
 print("Improved SVC Parameters")
 impr_rf = RandomForestClassifier(bootstrap=True, max_depth=110, max_features="log2", min_samples_leaf=1,
                                  min_samples_split=10, n_estimators=800, random_state=seed).fit(X_train, y_train)
 score_report(impr_rf, X_test, y_test)
-#testes
-multi_target_forest = MultiOutputClassifier(impr_rf, n_jobs=-1)
-multi_target_forest.fit(X_train, y_all_train)
-y_train_pred = multi_target_forest.predict(X_train)
-score_report(multi_target_forest, X_train, y_train)
 
 # Test XGbBoost
 print()
@@ -442,33 +470,35 @@ max_depth = [3, 6, 9, 12]
 gamma = [0, 0.2, 0.4]
 subsample = [0.1, 0.5, 1]
 colsample_bytree = [0.1, 0.5, 1]
-params = {'eta': eta,
-          'min_child_weight': min_child_weight,
-          'max_depth': max_depth,
-          'gamma': gamma,
-          'subsample': subsample,
-          'colsample_bytree': colsample_bytree
+params = {"eta": eta,
+          "min_child_weight": min_child_weight,
+          "max_depth": max_depth,
+          "gamma": gamma,
+          "subsample": subsample,
+          "colsample_bytree": colsample_bytree
           }
-best_random_xgb = random_search(X_train, X_test, y_train, y_test, xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
-                               grid=params, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
-#{'subsample': 1, 'min_child_weight': 1, 'max_depth': 12, 'gamma': 0, 'eta': 0.1, 'colsample_bytree': 0.1}
+best_random_xgb = random_search(X_train, X_test, y_train, y_test,
+                                xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
+                                grid=params, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
+# {"subsample": 1, "min_child_weight": 1, "max_depth": 12, "gamma": 0, "eta": 0.1, "colsample_bytree": 0.1}
 eta = [0.01, 0.02, 0.03, 0.04]
 min_child_weight = [6]
 max_depth = [8]
 gamma = [0.2]
 subsample = [0.8]
 colsample_bytree = [0.3]
-params_grid = {'eta': eta,
-          'min_child_weight': min_child_weight,
-          'max_depth': max_depth,
-          'gamma': gamma,
-          'subsample': subsample,
-          'colsample_bytree': colsample_bytree
-          }
+params_grid = {"eta": eta,
+               "min_child_weight": min_child_weight,
+               "max_depth": max_depth,
+               "gamma": gamma,
+               "subsample": subsample,
+               "colsample_bytree": colsample_bytree
+               }
 
-best_rf = grid_search(X_train, X_test, y_train, y_test, xgb.XGBClassifier(objective="binary:logistic", random_state=seed), params_grid, cv=10,
+best_rf = grid_search(X_train, X_test, y_train, y_test,
+                      xgb.XGBClassifier(objective="binary:logistic", random_state=seed), params_grid, cv=10,
                       scoring="f1", n_jobs=-2, verbose=True)
-#{'colsample_bytree': 0.3, 'eta': 0.05, 'gamma': 0.3, 'max_depth': 9, 'min_child_weight': 5, 'subsample': 0.8}
-#{'colsample_bytree': 0.3, 'eta': 0.04, 'gamma': 0.2, 'max_depth': 8, 'min_child_weight': 6, 'subsample': 0.8}
-#{'colsample_bytree': 0.3, 'eta': 0.03, 'gamma': 0.2, 'max_depth': 8, 'min_child_weight': 6, 'subsample': 0.8}
-#{'colsample_bytree': 0.3, 'eta': 0.01, 'gamma': 0.2, 'max_depth': 8, 'min_child_weight': 6, 'subsample': 0.8}
+# {"colsample_bytree": 0.3, "eta": 0.05, "gamma": 0.3, "max_depth": 9, "min_child_weight": 5, "subsample": 0.8}
+# {"colsample_bytree": 0.3, "eta": 0.04, "gamma": 0.2, "max_depth": 8, "min_child_weight": 6, "subsample": 0.8}
+# {"colsample_bytree": 0.3, "eta": 0.03, "gamma": 0.2, "max_depth": 8, "min_child_weight": 6, "subsample": 0.8}
+# {"colsample_bytree": 0.3, "eta": 0.01, "gamma": 0.2, "max_depth": 8, "min_child_weight": 6, "subsample": 0.8}

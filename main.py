@@ -446,10 +446,10 @@ params = {'eta': eta,
 best_random_xgb = random_search(X_train, X_test, y_train, y_test, xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
                                grid=params, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
 #{'subsample': 1, 'min_child_weight': 1, 'max_depth': 12, 'gamma': 0, 'eta': 0.1, 'colsample_bytree': 0.1}
-eta = [0.03, 0.04, 0.05]
-min_child_weight = [5, 6,7]
-max_depth = [7, 8, 9]
-gamma = [0.1, 0.2, 0.3]
+eta = [0.01, 0.02, 0.03, 0.04]
+min_child_weight = [6]
+max_depth = [8]
+gamma = [0.2]
 subsample = [0.8]
 colsample_bytree = [0.3]
 params_grid = {'eta': eta,
@@ -460,7 +460,9 @@ params_grid = {'eta': eta,
           'colsample_bytree': colsample_bytree
           }
 
-best_rf = grid_search(X_train, X_test, y_train, y_test, xgb.XGBClassifier(objective="binary:logistic", random_state=seed), params_grid, cv=5,
+best_rf = grid_search(X_train, X_test, y_train, y_test, xgb.XGBClassifier(objective="binary:logistic", random_state=seed), params_grid, cv=10,
                       scoring="f1", n_jobs=-2, verbose=True)
 #{'colsample_bytree': 0.3, 'eta': 0.05, 'gamma': 0.3, 'max_depth': 9, 'min_child_weight': 5, 'subsample': 0.8}
 #{'colsample_bytree': 0.3, 'eta': 0.04, 'gamma': 0.2, 'max_depth': 8, 'min_child_weight': 6, 'subsample': 0.8}
+#{'colsample_bytree': 0.3, 'eta': 0.03, 'gamma': 0.2, 'max_depth': 8, 'min_child_weight': 6, 'subsample': 0.8}
+#{'colsample_bytree': 0.3, 'eta': 0.01, 'gamma': 0.2, 'max_depth': 8, 'min_child_weight': 6, 'subsample': 0.8}

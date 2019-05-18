@@ -9,6 +9,7 @@ from sklearn.model_selection import GridSearchCV, train_test_split, cross_valida
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, \
     accuracy_score, roc_auc_score
+from sklearn.multioutput import MultiOutputClassifier
 from sklearn.preprocessing import scale
 import matplotlib.pyplot as plt
 import xgboost as xgb
@@ -332,7 +333,7 @@ y_all = df_y["Hepatobiliary disorders"].copy()
 y_train = all_y_train["Hepatobiliary disorders"].copy()
 y_test = all_y_test["Hepatobiliary disorders"].copy()
 df_desc = createdescriptors(df_molecules)
-
+y_all_train, y_all_test = train_test_split(df_y, test_size=0.2, random_state=seed)
 X_descriptors = select_best_descriptors(df_desc, y_all, funcscore=f_classif, k=2)
 df_desc_train, df_desc_test = train_test_split(X_descriptors, test_size=0.2, random_state=seed)
 
@@ -422,6 +423,11 @@ print("Improved SVC Parameters")
 impr_rf = RandomForestClassifier(bootstrap=True, max_depth=110, max_features="log2", min_samples_leaf=1,
                                  min_samples_split=10, n_estimators=800, random_state=seed).fit(X_train, y_train)
 score_report(impr_rf, X_test, y_test)
+#testes
+multi_target_forest = MultiOutputClassifier(impr_rf, n_jobs=-1)
+multi_target_forest.fit(X_train, y_all_train)
+y_train_pred = multi_target_forest.predict(X_train)
+score_report(multi_target_forest, X_train, y_train)
 
 # Test XGbBoost
 print()

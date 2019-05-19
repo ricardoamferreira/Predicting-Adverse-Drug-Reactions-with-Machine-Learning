@@ -1,19 +1,16 @@
 from mlprocess import *
-import pprint
-
 
 # Fixing the seed
 seed = 6
 np.random.seed(seed)
-
 
 # Creating base df_molecules, df_y with the results vectors, and df_mols_descr with the descriptors
 print("Creating Dataframes")
 y_all, df_molecules = create_original_df(write=False)
 df_molecules.drop("smiles", axis=1, inplace=True)
 y_all.drop("Product issues", axis=1, inplace=True)  # No real connection with the molecule, multiple problems
-out_names = y_all.columns.tolist()  # Get descriptors names
-#['Hepatobiliary disorders', 'Metabolism and nutrition disorders', 'Eye disorders', 'Investigations',
+out_names = y_all.columns.tolist()  # Get class labels
+# ['Hepatobiliary disorders', 'Metabolism and nutrition disorders', 'Eye disorders', 'Investigations',
 # 'Musculoskeletal and connective tissue disorders', 'Gastrointestinal disorders', 'Social circumstances',
 # 'Immune system disorders', 'Reproductive system and breast disorders',
 # 'Neoplasms benign, malignant and unspecified (incl cysts and polyps)',
@@ -28,7 +25,6 @@ out_names = y_all.columns.tolist()  # Get descriptors names
 # Separating in a DF_mols_train and an Df_mols_test, in order to avoid data snooping and fitting the model to the test
 df_mols_train, df_mols_test, y_train, y_test = train_test_split(df_molecules, y_all, test_size=0.2, random_state=seed)
 
-
 # Fingerprint length
 # all_df_results_svc = test_fingerprint_size(df_mols_train, all_y_train, SVC(gamma="scale", random_state=seed),
 #                                            makeplots=False, write=False)
@@ -39,20 +35,34 @@ X_all, _, _, _ = createfingerprints(df_molecules, length=1125)
 X_train_fp, _, _, _ = createfingerprints(df_mols_train, length=1125)
 X_test_fp, _, _, _ = createfingerprints(df_mols_test, length=1125)
 
-# Selecting and creating descriptors dataset
+# Selects and create descriptors dataset
 df_desc = createdescriptors(df_molecules)  # Create all descriptors
-# Split in train and test
+
+# Splits in train and test
 df_desc_base_train, df_desc_base_test = train_test_split(df_desc, test_size=0.2, random_state=seed)
 
-X_train_dic, X_test_dic, selected_cols = create_dataframes_dic(df_desc_base_train, df_desc_base_test, X_train_fp, X_test_fp, y_train, out_names, score_func=f_classif, k=3)
+# Creates a dictionary with key = class label and value = dataframe with fingerprint + best K descriptors for that label
+X_train_dic, X_test_dic, selected_cols = create_dataframes_dic(df_desc_base_train, df_desc_base_test, X_train_fp,
+                                                               X_test_fp, y_train, out_names, score_func=f_classif, k=3)
+
+# Model testing
+# SVC
+
+print()
+
+print("Base SVC:")
+base_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="auto", random_state=seed), cv=10,
+                                  n_jobs=-2, verbose=True)
+#ax = base_svc_report.transpose().plot.barh(y=["F1", "Recall", "ROC_AUC"])
 
 
+params_to_test = {"kernel": ["linear", "rbf"], "C": [0.1, 1, 10, 100], "gamma": [1, 0.1, 0.001]}
 
-
-
-
-
-
+best_params_by_label = {label: None for label in out_names}
+for label in out_names:
+    best_params, _ = grid_search(X_train_dic[label], X_test_dic[label], y_train[label], y_test[label], SVC(random_state=seed), params_to_test, cv=10, scoring="f1",
+                       verbose=True, n_jobs=-2)
+    best_params_by_label[label] = best_params
 
 
 
@@ -63,44 +73,9 @@ X_train_dic, X_test_dic, selected_cols = create_dataframes_dic(df_desc_base_trai
 # NOT CHECKED BELOW HERE
 
 
-
-
-
-
-
-
-
-
-
-
-
-# Join descriptors with fingerprint dataframe
-
-
-# SVC
-scoring_metrics=("f1_macro", "roc_auc", "recall_macro", "precision_macro", "accuracy")
-print()
-print("Base Multi Output SVC:")
-base_svc = SVC(gamma="auto", random_state=seed)
-multi_target_SVC_base = MultiOutputClassifier(base_svc, n_jobs=-2)
-cv_report(multi_target_SVC_base, X_train, y_train, cv=10, scoring_metrics=scoring_metrics, n_jobs=-2, verbose=True)
-multi_target_SVC_base
-params_to_test = {"estimator__kernel": ["linear", "rbf"], "estimator__C": [1, 10, 100], "estimator__gamma": [1, 0.1, 0.001]}
-
-best_svc = grid_search(X_train, X_test, y_train, y_test, multi_target_SVC_base, params_to_test, cv=10, scoring="f1_macro",
-                       verbose=True, n_jobs=-2)
-
-
-
-# SVC
-print()
-print("Base SVC:")
-base_svc = SVC(gamma="auto", random_state=seed).fit(X_train, y_train)
-score_report(base_svc, X_test, y_test)
-
 # Test SVC parameters
 # print("Test best SVC")
-params_to_test = {"kernel": ["linear", "rbf"], "C": [1, 10, 100], "gamma": [1, 0.1, 0.001]}
+
 best_svc = grid_search(X_train, X_test, y_train, y_test, SVC(random_state=seed), params_to_test, cv=10, scoring="f1",
                        verbose=True, n_jobs=-2)
 # {"C": 10, "gamma": 0.1, "kernel": "rbf"}

@@ -167,7 +167,11 @@ def select_best_descriptors(X, y, score_func=f_classif, k=2):
     return sel
 
 
-def create_dataframes_dic(df_desc_base_train, df_desc_base_test, X_train_fp, X_test_fp, y_train, out_names, score_func=f_classif, k=3):
+def create_dataframes_dic(df_desc_base_train, df_desc_base_test, X_train_fp, X_test_fp, y_train, out_names,
+                          score_func=f_classif, k=3):
+    # Create 3 dictionaries, one with the train dataframes, one with the test dataframes and one with the selected
+    # features for each label
+
     # Initialize dictonaries
     train_series_dic = {name: None for name in out_names}
     test_series_dic = {name: None for name in out_names}
@@ -190,47 +194,70 @@ def create_dataframes_dic(df_desc_base_train, df_desc_base_test, X_train_fp, X_t
     return train_series_dic, test_series_dic, selected_name
 
 
+def cv_multi_report(X_train_dic, y_train, out_names, model, cv=10, n_jobs=-1, verbose=False):
+    # Creates a scores report dataframe for each classification label with cv
+    # Initizalize the dataframe
+    report = pd.DataFrame(index=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], columns=out_names)
+    scoring_metrics = ("f1", "roc_auc", "recall", "precision", "accuracy")
+
+    # For each label
+    for name in out_names:
+        if verbose:
+            print(f"Scores for {name}")
+        # Calculate the score for the current label using the respective dataframe
+        scores = cv_report(model, X_train_dic[name], y_train[name], cv=cv, scoring_metrics=scoring_metrics,
+                           n_jobs=n_jobs, verbose=verbose)
+        report.loc["F1", name] = round(float(scores["f1_score"]), 3)
+        report.loc["ROC_AUC", name] = round(float(scores["auc_score"]), 3)
+        report.loc["Recall", name] = round(float(scores["rec_score"]), 3)
+        report.loc["Precision", name] = round(float(scores["prec_score"]), 3)
+        report.loc["Accuracy", name] = round(float(scores["acc_score"]), 3)
+    return report
+
+
 def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, scoring="f1", n_jobs=-1, verbose=False):
     # Define grid search
     grid_search = GridSearchCV(model, params_to_test, cv=cv, n_jobs=n_jobs, verbose=verbose, scoring=scoring)
 
     # Fit X and y to test parameters
     grid_search.fit(X_train, y_train)
-
-    # Print scores
-    print()
-    print("Score for development set:")
     means = grid_search.cv_results_["mean_test_score"]
     stds = grid_search.cv_results_["std_test_score"]
-    for mean, std, params in zip(means, stds, grid_search.cv_results_["params"]):
-        print("%0.3f (+/-%0.03f) for %r" % (mean, std * 1.96, params))
-    print()
 
-    # Print best parameters
-    print()
-    print("Best parameters set found:")
-    print(grid_search.best_params_)
-    print()
+    if verbose:
+        # Print scores
+        print()
+        print("Score for development set:")
+        for mean, std, params in zip(means, stds, grid_search.cv_results_["params"]):
+            print("%0.3f (+/-%0.03f) for %r" % (mean, std * 1.96, params))
+        print()
 
-    # Detailed Classification report
-    print()
-    print("Detailed classification report:")
-    print("The model is trained on the full development set.")
-    print("The scores are computed on the full evaluation set.")
-    print()
-    y_true, y_pred = y_test, grid_search.predict(X_test)
-    print(classification_report(y_true, y_pred))
-    print()
-    print("Confusion Matrix as")
-    print("""
-    TN FP
-    FN TP
-    """)
-    print(confusion_matrix(y_true, y_pred))
+        # Print best parameters
+        print()
+        print("Best parameters set found:")
+        print(grid_search.best_params_)
+        print()
+
+        # Detailed Classification report
+        print()
+        print("Detailed classification report:")
+        print("The model is trained on the full development set.")
+        print("The scores are computed on the full evaluation set.")
+        print()
+        y_true, y_pred = y_test, grid_search.predict(X_test)
+        print(classification_report(y_true, y_pred))
+        print()
+        print("Confusion Matrix as")
+        print("""
+        TN FP
+        FN TP
+        """)
+        print(confusion_matrix(y_true, y_pred))
     # Save best estimator
     best_estimator = grid_search.best_estimator_
+    best_params = grid_search.best_params_
     # And return it
-    return best_estimator
+    return best_params, best_estimator
 
 
 def random_search(X_train, X_test, y_train, y_test, model, grid, n_iter=100, cv=10, scoring="f1", n_jobs=-1,
@@ -317,32 +344,35 @@ def score_report(estimator, X_test, y_test):
     print()
 
 
-def cv_report(estimator, X_train, y_train, cv=10,
-              scoring_metrics=("f1_macro", "roc_auc", "recall_macro", "precision_macro", "accuracy"),
+def cv_report(estimator, X_train, y_train, cv=10, scoring_metrics=("f1", "roc_auc", "recall", "precision", "accuracy"),
               n_jobs=-1, verbose=False):
     # Cross validation
     scores = cross_validate(estimator, X_train, y_train, scoring=scoring_metrics, cv=cv, n_jobs=n_jobs, verbose=verbose,
                             return_train_score=False)
 
     # Means
-    f1_s = np.mean(scores["test_f1_macro"])
+    f1_s = np.mean(scores["test_f1"])
     auc_s = np.mean(scores["test_roc_auc"])
-    rec_s = np.mean(scores["test_recall_macro"])
-    prec_s = np.mean(scores["test_precision_macro"])
+    rec_s = np.mean(scores["test_recall"])
+    prec_s = np.mean(scores["test_precision"])
     acc_s = np.mean(scores["test_accuracy"])
 
     # STD
-    f1_std = np.std(scores["test_f1_macro"])
+    f1_std = np.std(scores["test_f1"])
     auc_std = np.std(scores["test_roc_auc"])
-    rec_std = np.std(scores["test_recall_macro"])
-    prec_std = np.std(scores["test_precision_macro"])
+    rec_std = np.std(scores["test_recall"])
+    prec_std = np.std(scores["test_precision"])
     acc_std = np.std(scores["test_accuracy"])
 
-    print()
-    print("Individual metrics")
-    print(f"F1 Score: Mean: {f1_s:.3f} (Std: {f1_std:.3f})")
-    print(f"ROC-AUC score: Mean: {auc_s:.3f} (Std: {auc_std:.3f})")
-    print(f"Recall score: Mean: {rec_s:.3f} (Std: {rec_std:.3f})")
-    print(f"Precision score: Mean: {prec_s:.3f} (Std: {prec_std:.3f})")
-    print(f"Accuracy score: Mean: {acc_s:.3f} (Std: {acc_std:.3f})")
-    print()
+    if verbose:
+        print()
+        print("Individual metrics")
+        print(f"F1 Score: Mean: {f1_s:.3f} (Std: {f1_std:.3f})")
+        print(f"ROC-AUC score: Mean: {auc_s:.3f} (Std: {auc_std:.3f})")
+        print(f"Recall score: Mean: {rec_s:.3f} (Std: {rec_std:.3f})")
+        print(f"Precision score: Mean: {prec_s:.3f} (Std: {prec_std:.3f})")
+        print(f"Accuracy score: Mean: {acc_s:.3f} (Std: {acc_std:.3f})")
+        print()
+
+    return {"f1_score": f1_s, "f1_std": f1_std, "auc_score": auc_s, "auc_std": auc_std, "rec_score": rec_s,
+            "rec_std": rec_std, "prec_score": prec_s, "prec_std": prec_std, "acc_score": acc_s, "acc_std": acc_std}

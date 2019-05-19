@@ -144,7 +144,30 @@ def test_fingerprint_size(df_mols, df_y, model, num_sizes_to_test=20, min_size=1
     return all_df_results
 
 
-def select_best_descriptors(df_desc, y_all, out_names=[], score_func=f_classif, k=1):
+def select_best_descriptors_multi(df_desc, y_all, out_names=[], score_func=f_classif, k=1):
+    # Select k highest scoring feature from X to every y and return new df with only the selected ones
+    if not out_names:
+        print("Column names necessary")
+        return None
+    selected = []
+    for n in out_names:
+        skb = SelectKBest(score_func=score_func, k=k).fit(df_desc, y_all[n])
+        n_sel_bol = skb.get_support()
+        sel = df_desc.loc[:, n_sel_bol].columns.to_list()
+        for s in sel:
+            if s not in selected:
+                selected.append(s)
+    return selected
+
+
+def select_best_descriptors(X, y, score_func=f_classif, k=2):
+    # Select k highest scoring feature from X to y with a score function, f_classif by defatult
+    X_new = SelectKBest(score_func=score_func, k=k).fit_transform(X, y)
+    X_new_df = pd.DataFrame(X_new)
+    return X_new_df
+
+
+def select_best_descriptors_multi(df_desc, y_all, out_names=[], score_func=f_classif, k=1):
     # Select k highest scoring feature from X to every y and return new df with only the selected ones
     if not out_names:
         print("Column names necessary")
@@ -351,7 +374,7 @@ df_desc = createdescriptors(df_molecules)  # Create all descriptors
 df_desc_base_train, df_desc_base_test = train_test_split(df_desc, test_size=0.2, random_state=seed)
 out_names = y_all.columns.tolist()  # Get descriptors names
 # Get list with selected descriptors for every Y
-selected = select_best_descriptors(df_desc_base_train, y_train, out_names=out_names, score_func=f_classif, k=3)
+selected = select_best_descriptors(df_desc_base_train, y_train, score_func=f_classif, k=2)
 df_desc_train = df_desc_base_train.loc[:, selected].copy()  # Get train dataframe with only selected columns
 df_desc_test = df_desc_base_test.loc[:, selected].copy()  # Get test dataframe with only selected columns
 
@@ -365,11 +388,12 @@ print()
 print("Base Multi Output SVC:")
 base_svc = SVC(gamma="auto", random_state=seed)
 multi_target_SVC_base = MultiOutputClassifier(base_svc, n_jobs=-2)
-#cv_report(multi_target_SVC_base, X_train, y_train, cv=10, scoring_metrics=scoring_metrics, n_jobs=-2, verbose=True)
-multi_target_SVC_base.fit(X_train, y_train)
-print(classification_report(y_train, multi_target_SVC_base.predict(X_train)))
+cv_report(multi_target_SVC_base, X_train, y_train, cv=10, scoring_metrics=scoring_metrics, n_jobs=-2, verbose=True)
+multi_target_SVC_base
+params_to_test = {"estimator__kernel": ["linear", "rbf"], "estimator__C": [1, 10, 100], "estimator__gamma": [1, 0.1, 0.001]}
 
-
+best_svc = grid_search(X_train, X_test, y_train, y_test, multi_target_SVC_base, params_to_test, cv=10, scoring="f1_macro",
+                       verbose=True, n_jobs=-2)
 
 
 

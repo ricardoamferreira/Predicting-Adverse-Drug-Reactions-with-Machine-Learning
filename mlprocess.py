@@ -3,17 +3,13 @@ import numpy as np
 import create_fingerprints as cf
 import create_descriptors as cd
 from rdkit import Chem
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV, train_test_split, cross_validate, RandomizedSearchCV
-from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif, RFECV
+from sklearn.model_selection import GridSearchCV, cross_validate, RandomizedSearchCV
+from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, \
     accuracy_score, roc_auc_score
-from sklearn.multioutput import MultiOutputClassifier
-from sklearn.preprocessing import scale
 import matplotlib.pyplot as plt
-import xgboost as xgb
-from tqdm import tqdm
+from imblearn.over_sampling import BorderlineSMOTE
+from collections import Counter
 
 
 def create_original_df(write=False):
@@ -77,7 +73,7 @@ def test_fingerprint_size(df_mols, df_y, model, colname="Hepatobiliary disorders
     # Get test sizes
     c = 0
     # Size testing using SVC with scale gamma (1 / (n_features * X.var()))
-    for s in tqdm(sizes):
+    for s in sizes:
         # Create fingerprint with size S
         fingerprints = createfingerprints(df_mols, int(s))
         r = 0
@@ -194,10 +190,36 @@ def create_dataframes_dic(df_desc_base_train, df_desc_base_test, X_train_fp, X_t
     return train_series_dic, test_series_dic, selected_name
 
 
-def cv_multi_report(X_train_dic, y_train, out_names, model, cv=10, n_jobs=-1, verbose=False):
+# Over-sampling with SMOT borderline-2 (comparison: https://run.unl.pt/bitstream/10362/31307/1/TEGI0396.pdf)
+def balance_dataset(X_train_dic, y_train_dic, out_names, random_state=0, n_jobs=-1, verbose=False):
+    # Initialize the dictionaries
+    train_series_dic_bal = {name: None for name in out_names}
+    y_dic_bal = {name: None for name in out_names}
+
+    # For each classficiation label
+    for label in out_names:
+        X_imb = X_train_dic[label]
+        y_imb = y_train_dic[label]
+        X_bal, y_bal = BorderlineSMOTE(random_state=random_state, kind="borderline-2", n_jobs=n_jobs).fit_resample(
+            X_imb, y_imb)
+        train_series_dic_bal[label] = X_bal
+        y_dic_bal[label] = y_bal
+
+    # Print new counts
+    if verbose:
+        for label in out_names:
+            print(f"For {label}")
+            print(sorted(Counter(y_train_dic[label]).items()))
+            print(sorted(Counter(y_dic_bal[label]).items()))
+
+    # Return the new dictionaries
+    return train_series_dic_bal, y_dic_bal
+
+
+def cv_multi_report(X_train_dic, y_train, out_names, model, modelname=None, spec_params=None, cv=10, n_jobs=-1, verbose=False):
     # Creates a scores report dataframe for each classification label with cv
     # Initizalize the dataframe
-    report = pd.DataFrame(index=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], columns=out_names)
+    report = pd.DataFrame(columns=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], index=out_names)
     scoring_metrics = ("f1", "roc_auc", "recall", "precision", "accuracy")
 
     # For each label
@@ -205,17 +227,29 @@ def cv_multi_report(X_train_dic, y_train, out_names, model, cv=10, n_jobs=-1, ve
         if verbose:
             print(f"Scores for {name}")
         # Calculate the score for the current label using the respective dataframe
-        scores = cv_report(model, X_train_dic[name], y_train[name], cv=cv, scoring_metrics=scoring_metrics,
-                           n_jobs=n_jobs, verbose=verbose)
-        report.loc["F1", name] = round(float(scores["f1_score"]), 3)
-        report.loc["ROC_AUC", name] = round(float(scores["auc_score"]), 3)
-        report.loc["Recall", name] = round(float(scores["rec_score"]), 3)
-        report.loc["Precision", name] = round(float(scores["prec_score"]), 3)
-        report.loc["Accuracy", name] = round(float(scores["acc_score"]), 3)
+        if spec_params:
+            if modelname == "SVC":
+                model_temp = model
+                model_temp.set_params(C=spec_params[name]["C"], gamma=spec_params[name]["gamma"],
+                                  kernel=spec_params[name]["kernel"])
+            else:
+                print("Please specify used model")
+                return None
+            scores = cv_report(model_temp, X_train_dic[name], y_train[name], cv=cv, scoring_metrics=scoring_metrics,
+                               n_jobs=n_jobs, verbose=verbose)
+        else:
+            scores = cv_report(model, X_train_dic[name], y_train[name], cv=cv, scoring_metrics=scoring_metrics,
+                               n_jobs=n_jobs, verbose=verbose)
+        report.loc[name, "F1"] = round(float(scores["f1_score"]), 3)
+        report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
+        report.loc[name, "Recall",] = round(float(scores["rec_score"]), 3)
+        report.loc[name, "Precision"] = round(float(scores["prec_score"]), 3)
+        report.loc[name, "Accuracy"] = round(float(scores["acc_score"]), 3)
     return report
 
 
-def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, scoring="f1", n_jobs=-1, verbose=False):
+def grid_search(X_train, y_train, model, params_to_test, X_test=None, y_test=None, cv=10, scoring="f1", n_jobs=-1,
+                verbose=False):
     # Define grid search
     grid_search = GridSearchCV(model, params_to_test, cv=cv, n_jobs=n_jobs, verbose=verbose, scoring=scoring)
 
@@ -237,27 +271,51 @@ def grid_search(X_train, X_test, y_train, y_test, model, params_to_test, cv=10, 
         print("Best parameters set found:")
         print(grid_search.best_params_)
         print()
-
-        # Detailed Classification report
-        print()
-        print("Detailed classification report:")
-        print("The model is trained on the full development set.")
-        print("The scores are computed on the full evaluation set.")
-        print()
-        y_true, y_pred = y_test, grid_search.predict(X_test)
-        print(classification_report(y_true, y_pred))
-        print()
-        print("Confusion Matrix as")
-        print("""
-        TN FP
-        FN TP
-        """)
-        print(confusion_matrix(y_true, y_pred))
+        if X_test and y_test:
+            # Detailed Classification report
+            print()
+            print("Detailed classification report:")
+            print("The model is trained on the full development set.")
+            print("The scores are computed on the full evaluation set.")
+            print()
+            y_true, y_pred = y_test, grid_search.predict(X_test)
+            print(classification_report(y_true, y_pred))
+            print()
+            print("Confusion Matrix as")
+            print("""
+            TN FP
+            FN TP
+            """)
+            print(confusion_matrix(y_true, y_pred))
     # Save best estimator
     best_estimator = grid_search.best_estimator_
     best_params = grid_search.best_params_
     # And return it
     return best_params, best_estimator
+
+
+def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_test, X_test=None, y_test=None, cv=10,
+                            scoring="f1", n_jobs=-1, verbose=False):
+    # Creates a dictionary with the best params in regards to chosen metric for each label
+
+    # Creates the dictionary
+    best_params_by_label = {label: None for label in out_names}
+
+    # If X_test and y_test is given so that generalization evalutation can happen
+    if X_test and y_test:
+        for label in out_names:
+            print(f"Scores for {label}")
+            best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test, X_test[label],
+                                         y_test[label], cv=cv, scoring=scoring, verbose=verbose, n_jobs=n_jobs)
+            best_params_by_label[label] = best_params
+    else:
+        for label in out_names:
+            print(f"Scores for {label}")
+            best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test, cv=cv,
+                                         scoring=scoring, verbose=verbose, n_jobs=n_jobs)
+            best_params_by_label[label] = best_params
+
+    return best_params_by_label
 
 
 def random_search(X_train, X_test, y_train, y_test, model, grid, n_iter=100, cv=10, scoring="f1", n_jobs=-1,

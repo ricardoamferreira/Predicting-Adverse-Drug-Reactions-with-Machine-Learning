@@ -84,41 +84,44 @@ diff_impr = impr_bal_svc_report - base_bal_svc_report
 ax2 = diff_impr.plot.barh()
 
 
-
-
-# NOT CHECKED BELOW HERE
-
-
-# Test SVC parameters
-
-
-# Test RF
+# RF
 print()
-print("Base RF:")
-base_rf = RandomForestClassifier(random_state=seed).fit(X_train, y_train)
-score_report(base_rf, X_test, y_test)
-# F1 score: 0.66
-# ROC-AUC score: 0.66
-# Recall score: 0.63
-# Precision score: 0.70
-# Accuracy score: 0.66
+print("Base RF without balancing:")
+base_rf_report = cv_multi_report(X_train_dic, y_train, out_names,
+                                 RandomForestClassifier(n_estimators=100, random_state=seed), cv=10,n_jobs=-2,
+                                 verbose=True)
 
-print("Random Search RF")
-# n_estimators = [int(x) for x in np.linspace(500, 1000, 10, dtype=int)]
-n_estimators = [720, 740, 760, 780, 800, 820, 840]
-max_features = ["log2"]
-# max_depth = [int(x) for x in np.linspace(50, 300, 10, dtype=int)]
-max_depth = [70, 80, 90, 100, 110]
-min_samples_split = [9, 10, 11, 12]
-min_samples_leaf = [1]
-bootstrap = [True]
+print()
+print("Base RF with balancing:")
+base_bal_rf_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names,
+                                     RandomForestClassifier(n_estimators=100, random_state=seed),cv=10,n_jobs=-2,
+                                     verbose=True)
+diff_bal_rf = base_bal_rf_report - base_rf_report
+ax3 = diff_bal_rf.plot.barh()
 
-random_grid = {"n_estimators": n_estimators,
+
+n_estimators = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+max_features = ["log2", "sqrt", None]
+max_depth = [50, 70, 90, 110, 130, 150, 170, 190, 210, 230, 250, None]
+min_samples_split = [2, 5, 10, 20]
+min_samples_leaf = [1, 2, 5, 10]
+bootstrap = [True, False]
+rf_grid = {"n_estimators": n_estimators,
                "max_features": max_features,
                "max_depth": max_depth,
                "min_samples_split": min_samples_split,
                "min_samples_leaf": min_samples_leaf,
                "bootstrap": bootstrap}
+
+best_RF_params_by_label = multi_label_grid_search(train_series_dic_bal, y_dic_bal, out_names,
+                                                   RandomForestClassifier(random_state=seed),
+                                                   rf_grid, cv=5, scoring="f1", n_jobs=-2, verbose=True)
+
+
+
+# NOT CHECKED BELOW HERE
+
+
 
 best_random_rf = random_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed),
                                grid=random_grid, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)

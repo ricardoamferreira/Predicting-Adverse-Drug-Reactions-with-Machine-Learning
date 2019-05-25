@@ -101,7 +101,7 @@ ax3 = diff_bal_rf.plot.barh()
 
 
 n_estimators = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
-max_features = ["log2", "sqrt", None]
+max_features = ["log2", "sqrt"]
 max_depth = [50, 70, 90, 110, 130, 150, 170, 190, 210, 230, 250, None]
 min_samples_split = [2, 5, 10, 20]
 min_samples_leaf = [1, 2, 5, 10]
@@ -113,18 +113,16 @@ rf_grid = {"n_estimators": n_estimators,
                "min_samples_leaf": min_samples_leaf,
                "bootstrap": bootstrap}
 
-best_RF_params_by_label = multi_label_grid_search(train_series_dic_bal, y_dic_bal, out_names,
+best_RF_params_by_label = multi_label_random_search(train_series_dic_bal, y_dic_bal, out_names,
                                                    RandomForestClassifier(random_state=seed),
-                                                   rf_grid, cv=5, scoring="f1", n_jobs=-2, verbose=True)
+                                                   rf_grid, n_iter=300, cv=5, scoring="f1", n_jobs=-2, verbose=True)
 
 
 
 # NOT CHECKED BELOW HERE
 
 
-
-best_random_rf = random_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed),
-                               grid=random_grid, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
+best_random_rf = random_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed),grid=random_grid, n_iter=300, cv=5, scoring="f1", n_jobs=-2, verbose=True)
 
 best_rf = grid_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), random_grid, cv=3,
                       scoring="f1", n_jobs=-2, verbose=True)

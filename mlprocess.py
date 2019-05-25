@@ -305,7 +305,7 @@ def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_te
     if X_test and y_test:
         for label in out_names:
             print(f"Scores for {label}")
-            best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test, X_test[label],
+            best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test, X_test[label],
                                          y_test[label], cv=cv, scoring=scoring, verbose=verbose, n_jobs=n_jobs)
             best_params_by_label[label] = best_params
     else:
@@ -318,51 +318,79 @@ def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_te
     return best_params_by_label
 
 
-def random_search(X_train, X_test, y_train, y_test, model, grid, n_iter=100, cv=10, scoring="f1", n_jobs=-1,
+def random_search(X_train, y_train,  model, params_to_test, X_test=None, y_test=None , n_iter=100, cv=10, scoring="f1", n_jobs=-1,
                   verbose=False):
     # Define random search
-    rs = RandomizedSearchCV(model, grid, n_iter=n_iter, cv=cv, scoring=scoring, n_jobs=n_jobs, verbose=verbose)
+    rs = RandomizedSearchCV(model, params_to_test, n_iter=n_iter,  cv=cv, n_jobs=n_jobs, verbose=verbose, scoring=scoring)
 
     # Fit parameters
     rs.fit(X_train, y_train)
-
-    # Print scores
-    print()
-    print("Score for development set:")
     means = rs.cv_results_["mean_test_score"]
     stds = rs.cv_results_["std_test_score"]
-    for mean, std, params in zip(means, stds, rs.cv_results_["params"]):
-        print("%0.3f (+/-%0.03f) for %r" % (mean, std * 1.96, params))
-    print()
 
-    # Print best parameters
-    print()
-    print("Best parameters set found:")
-    print(rs.best_params_)
-    print()
+    # Print scores
+    if verbose:
+        print()
+        print("Score for development set:")
 
-    # Detailed Classification report
-    print()
-    print("Detailed classification report:")
-    print("The model is trained on the full development set.")
-    print("The scores are computed on the full evaluation set.")
-    print()
-    y_true, y_pred = y_test, rs.predict(X_test)
-    print(classification_report(y_true, y_pred))
-    print()
-    """
-    print("Confusion matrix as:")
-    print(
-           TN FP
-           FN TP
-           )
-    print(confusion_matrix(y_true, y_pred))
-    print()
-    """
+        for mean, std, params in zip(means, stds, rs.cv_results_["params"]):
+            print("%0.3f (+/-%0.03f) for %r" % (mean, std * 1.96, params))
+        print()
+
+        # Print best parameters
+        print()
+        print("Best parameters set found:")
+        print(rs.best_params_)
+        print()
+        if X_test and y_test:
+            # Detailed Classification report
+
+            print()
+            print("Detailed classification report:")
+            print("The model is trained on the full development set.")
+            print("The scores are computed on the full evaluation set.")
+            print()
+            y_true, y_pred = y_test, rs.predict(X_test)
+            print(classification_report(y_true, y_pred))
+            print()
+            """
+            print("Confusion matrix as:")
+            print(
+                   TN FP
+                   FN TP
+                   )
+            print(confusion_matrix(y_true, y_pred))
+            print()
+            """
     # Save best estimator
     best_estimator = rs.best_estimator_
+    best_params = rs.best_params_
     # And return it
-    return best_estimator
+    return best_params, best_estimator
+
+
+def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_test, X_test=None, y_test=None, n_iter=300, cv=10,
+                            scoring="f1", n_jobs=-1, verbose=False):
+    # Creates a dictionary with the best params in regards to chosen metric for each label
+
+    # Creates the dictionary
+    best_params_by_label = {label: None for label in out_names}
+
+    # If X_test and y_test is given so that generalization evalutation can happen
+    if X_test and y_test:
+        for label in out_names:
+            print(f"Scores for {label}")
+            best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test, X_test[label],
+                                         y_test[label], n_iter=n_iter, cv=cv, scoring=scoring, verbose=verbose, n_jobs=n_jobs)
+            best_params_by_label[label] = best_params
+    else:
+        for label in out_names:
+            print(f"Scores for {label}")
+            best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test, n_iter=n_iter, cv=cv,
+                                         scoring=scoring, verbose=verbose, n_jobs=n_jobs)
+            best_params_by_label[label] = best_params
+
+    return best_params_by_label
 
 
 def score_report(estimator, X_test, y_test):

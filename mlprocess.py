@@ -216,7 +216,8 @@ def balance_dataset(X_train_dic, y_train_dic, out_names, random_state=0, n_jobs=
     return train_series_dic_bal, y_dic_bal
 
 
-def cv_multi_report(X_train_dic, y_train, out_names, model, modelname=None, spec_params=None, cv=10, n_jobs=-1, verbose=False):
+def cv_multi_report(X_train_dic, y_train, out_names, model, modelname=None, spec_params=None, cv=10, n_jobs=-1,
+                    verbose=False):
     # Creates a scores report dataframe for each classification label with cv
     # Initizalize the dataframe
     report = pd.DataFrame(columns=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], index=out_names)
@@ -230,10 +231,19 @@ def cv_multi_report(X_train_dic, y_train, out_names, model, modelname=None, spec
         if spec_params:
             if modelname == "SVC":
                 model_temp = model
-                model_temp.set_params(C=spec_params[name]["C"], gamma=spec_params[name]["gamma"],
-                                  kernel=spec_params[name]["kernel"])
+                model_temp.set_params(C=spec_params[name]["C"],
+                                      gamma=spec_params[name]["gamma"],
+                                      kernel=spec_params[name]["kernel"])
+            elif modelname == "RF":
+                model_temp = model
+                model_temp.set_params(bootstrap=spec_params[name]["bootstrap"],
+                                      max_depth=spec_params[name]["max_depth"],
+                                      max_features=spec_params[name]["max_features"],
+                                      min_samples_leaf=spec_params[name]["min_samples_leaf"],
+                                      min_samples_split=spec_params[name]["min_samples_split"],
+                                      n_estimators=spec_params[name]["n_estimators"])
             else:
-                print("Please specify used model")
+                print("Please specify used model (SVC, RF)")
                 return None
             scores = cv_report(model_temp, X_train_dic[name], y_train[name], cv=cv, scoring_metrics=scoring_metrics,
                                n_jobs=n_jobs, verbose=verbose)
@@ -242,7 +252,7 @@ def cv_multi_report(X_train_dic, y_train, out_names, model, modelname=None, spec
                                n_jobs=n_jobs, verbose=verbose)
         report.loc[name, "F1"] = round(float(scores["f1_score"]), 3)
         report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
-        report.loc[name, "Recall",] = round(float(scores["rec_score"]), 3)
+        report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)
         report.loc[name, "Precision"] = round(float(scores["prec_score"]), 3)
         report.loc[name, "Accuracy"] = round(float(scores["acc_score"]), 3)
     return report
@@ -305,23 +315,25 @@ def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_te
     if X_test and y_test:
         for label in out_names:
             print(f"Scores for {label}")
-            best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test, X_test[label],
-                                         y_test[label], cv=cv, scoring=scoring, verbose=verbose, n_jobs=n_jobs)
+            best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test[label],
+                                         X_test[label], y_test[label], cv=cv, scoring=scoring, verbose=verbose,
+                                         n_jobs=n_jobs)
             best_params_by_label[label] = best_params
     else:
         for label in out_names:
             print(f"Scores for {label}")
-            best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test, cv=cv,
+            best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test[label], cv=cv,
                                          scoring=scoring, verbose=verbose, n_jobs=n_jobs)
             best_params_by_label[label] = best_params
 
     return best_params_by_label
 
 
-def random_search(X_train, y_train,  model, params_to_test, X_test=None, y_test=None , n_iter=100, cv=10, scoring="f1", n_jobs=-1,
-                  verbose=False):
+def random_search(X_train, y_train, model, params_to_test, X_test=None, y_test=None, n_iter=100, cv=10, scoring="f1",
+                  n_jobs=-1, verbose=False):
     # Define random search
-    rs = RandomizedSearchCV(model, params_to_test, n_iter=n_iter,  cv=cv, n_jobs=n_jobs, verbose=verbose, scoring=scoring)
+    rs = RandomizedSearchCV(model, params_to_test, n_iter=n_iter, cv=cv, n_jobs=n_jobs, verbose=verbose,
+                            scoring=scoring)
 
     # Fit parameters
     rs.fit(X_train, y_train)
@@ -369,8 +381,8 @@ def random_search(X_train, y_train,  model, params_to_test, X_test=None, y_test=
     return best_params, best_estimator
 
 
-def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_test, X_test=None, y_test=None, n_iter=300, cv=10,
-                            scoring="f1", n_jobs=-1, verbose=False):
+def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_test, X_test=None, y_test=None,
+                              n_iter=300, cv=10, scoring="f1", n_jobs=-1, verbose=False):
     # Creates a dictionary with the best params in regards to chosen metric for each label
 
     # Creates the dictionary
@@ -380,14 +392,15 @@ def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_
     if X_test and y_test:
         for label in out_names:
             print(f"Scores for {label}")
-            best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test, X_test[label],
-                                         y_test[label], n_iter=n_iter, cv=cv, scoring=scoring, verbose=verbose, n_jobs=n_jobs)
+            best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test[label],
+                                           X_test[label], y_test[label], n_iter=n_iter, cv=cv, scoring=scoring,
+                                           verbose=verbose, n_jobs=n_jobs)
             best_params_by_label[label] = best_params
     else:
         for label in out_names:
             print(f"Scores for {label}")
-            best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test, n_iter=n_iter, cv=cv,
-                                         scoring=scoring, verbose=verbose, n_jobs=n_jobs)
+            best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test[label],
+                                           n_iter=n_iter, cv=cv, scoring=scoring, verbose=verbose, n_jobs=n_jobs)
             best_params_by_label[label] = best_params
 
     return best_params_by_label

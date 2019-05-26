@@ -1,4 +1,5 @@
 from mlprocess import *
+from params_by_label import *
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
@@ -14,16 +15,6 @@ df_molecules.drop("smiles", axis=1, inplace=True)
 todrop = ["Product issues", "Investigations", "Social circumstances"]
 y_all.drop(todrop, axis=1, inplace=True)  # No real connection with the molecule, multiple problems
 out_names = y_all.columns.tolist()  # Get class labels
-# ['Hepatobiliary disorders', 'Metabolism and nutrition disorders', 'Eye disorders',
-# 'Musculoskeletal and connective tissue disorders', 'Gastrointestinal disorders', 'Immune system disorders',
-# 'Reproductive system and breast disorders', 'Neoplasms benign, malignant and unspecified (incl cysts and polyps)',
-# 'General disorders and administration site conditions', 'Endocrine disorders', 'Surgical and medical procedures',
-# 'Vascular disorders', 'Blood and lymphatic system disorders', 'Skin and subcutaneous tissue disorders',
-# 'Congenital, familial and genetic disorders', 'Infections and infestations',
-# 'Respiratory, thoracic and mediastinal disorders', 'Psychiatric disorders', 'Renal and urinary disorders',
-# 'Pregnancy, puerperium and perinatal conditions', 'Ear and labyrinth disorders', 'Cardiac disorders',
-# 'Nervous system disorders', 'Injury, poisoning and procedural complications']
-
 
 # Separating in a DF_mols_train and an Df_mols_test, in order to avoid data snooping and fitting the model to the test
 df_mols_train, df_mols_test, y_train, y_test = train_test_split(df_molecules, y_all, test_size=0.2, random_state=seed)
@@ -57,6 +48,7 @@ y_train_dic = {name: y_train[name] for name in out_names}
 train_series_dic_bal, y_dic_bal = balance_dataset(X_train_dic, y_train_dic, out_names, random_state=seed, n_jobs=-2,
                                                   verbose=True)
 
+# ML MODELS
 # SVC
 print("Base SVC without balancing:")
 base_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="auto", random_state=seed), cv=10,
@@ -83,23 +75,22 @@ impr_bal_svc_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names
 diff_impr = impr_bal_svc_report - base_bal_svc_report
 ax2 = diff_impr.plot.barh()
 
-
 # RF
 print()
 print("Base RF without balancing:")
 base_rf_report = cv_multi_report(X_train_dic, y_train, out_names,
-                                 RandomForestClassifier(n_estimators=100, random_state=seed), cv=10,n_jobs=-2,
+                                 RandomForestClassifier(n_estimators=100, random_state=seed), cv=10, n_jobs=-2,
                                  verbose=True)
 
 print()
 print("Base RF with balancing:")
 base_bal_rf_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names,
-                                     RandomForestClassifier(n_estimators=100, random_state=seed),cv=10,n_jobs=-2,
+                                     RandomForestClassifier(n_estimators=100, random_state=seed), cv=10, n_jobs=-2,
                                      verbose=True)
 diff_bal_rf = base_bal_rf_report - base_rf_report
 ax3 = diff_bal_rf.plot.barh()
 
-
+# Random
 n_estimators = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
 max_features = ["log2", "sqrt"]
 max_depth = [50, 70, 90, 110, 130, 150, 170, 190, 210, 230, 250, None]
@@ -107,33 +98,34 @@ min_samples_split = [2, 5, 10, 20]
 min_samples_leaf = [1, 2, 5, 10]
 bootstrap = [True, False]
 rf_grid = {"n_estimators": n_estimators,
-               "max_features": max_features,
-               "max_depth": max_depth,
-               "min_samples_split": min_samples_split,
-               "min_samples_leaf": min_samples_leaf,
-               "bootstrap": bootstrap}
+           "max_features": max_features,
+           "max_depth": max_depth,
+           "min_samples_split": min_samples_split,
+           "min_samples_leaf": min_samples_leaf,
+           "bootstrap": bootstrap}
+rf_grid_label = {name: rf_grid for name in out_names}
 
-best_RF_params_by_label = multi_label_random_search(train_series_dic_bal, y_dic_bal, out_names,
-                                                   RandomForestClassifier(random_state=seed),
-                                                   rf_grid, n_iter=300, cv=5, scoring="f1", n_jobs=-2, verbose=True)
+#
+# best_RF_params_by_label_random = multi_label_random_search(train_series_dic_bal, y_dic_bal, out_names,
+#                                                     RandomForestClassifier(random_state=seed), rf_grid_label,
+#                                                     n_iter=300,
+#                                                     cv=5, scoring="f1", n_jobs=-2, verbose=True)
+#
+# best_RF_params_by_label_grid = multi_label_grid_search(train_series_dic_bal, y_dic_bal, out_names,
+#                                                        RandomForestClassifier(random_state=seed), rf_params_to_grid,
+#                                                        cv=5, scoring="f1", n_jobs=-2, verbose=True)
 
-
-
-# NOT CHECKED BELOW HERE
-
-
-best_random_rf = random_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed),grid=random_grid, n_iter=300, cv=5, scoring="f1", n_jobs=-2, verbose=True)
-
-best_rf = grid_search(X_train, X_test, y_train, y_test, RandomForestClassifier(random_state=seed), random_grid, cv=3,
-                      scoring="f1", n_jobs=-2, verbose=True)
-# {"bootstrap": True, "max_depth": 110, "max_features": "log2", "min_samples_leaf": 1, "min_samples_split": 10, "n_estimators": 800}
 
 print()
-print("Improved SVC Parameters")
-impr_rf = RandomForestClassifier(bootstrap=True, max_depth=110, max_features="log2", min_samples_leaf=1,
-                                 min_samples_split=10, n_estimators=800, random_state=seed).fit(X_train, y_train)
-score_report(impr_rf, X_test, y_test)
+print("Improved RF with balancing:")
+impr_bal_RF_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names,
+                                     RandomForestClassifier(random_state=seed), modelname="RF",
+                                     spec_params=best_RF_params_by_label_grid, cv=10, n_jobs=-2, verbose=True)
 
+diff_impr_rf = impr_bal_RF_report - base_bal_rf_report
+ax2 = diff_impr_rf.plot.barh()
+
+'''
 # Test XGbBoost
 print()
 print("Base XGBoost:")
@@ -179,79 +171,4 @@ best_rf = grid_search(X_train, X_test, y_train, y_test,
 # {"colsample_bytree": 0.3, "eta": 0.04, "gamma": 0.2, "max_depth": 8, "min_child_weight": 6, "subsample": 0.8}
 # {"colsample_bytree": 0.3, "eta": 0.03, "gamma": 0.2, "max_depth": 8, "min_child_weight": 6, "subsample": 0.8}
 # {"colsample_bytree": 0.3, "eta": 0.01, "gamma": 0.2, "max_depth": 8, "min_child_weight": 6, "subsample": 0.8}
-
-
-### EXTRA Results
-
-best_svc_params_by_label = {'Blood and lymphatic system disorders': {'C': 10,
-                                                                     'gamma': 0.1,
-                                                                     'kernel': 'rbf'},
-                            'Cardiac disorders': {'C': 100,
-                                                  'gamma': 0.1,
-                                                  'kernel': 'rbf'},
-                            'Congenital, familial and genetic disorders': {'C': 10,
-                                                                           'gamma': 0.1,
-                                                                           'kernel': 'rbf'},
-                            'Ear and labyrinth disorders': {'C': 100,
-                                                            'gamma': 0.01,
-                                                            'kernel': 'rbf'},
-                            'Endocrine disorders': {'C': 1,
-                                                    'gamma': 0.1,
-                                                    'kernel': 'rbf'},
-                            'Eye disorders': {'C': 10,
-                                              'gamma': 0.1,
-                                              'kernel': 'rbf'},
-                            'Gastrointestinal disorders': {'C': 10,
-                                                           'gamma': 0.1,
-                                                           'kernel': 'rbf'},
-                            'General disorders and administration site conditions': {'C': 10,
-                                                                                     'gamma': 0.1,
-                                                                                     'kernel': 'rbf'},
-                            'Hepatobiliary disorders': {'C': 1,
-                                                        'gamma': 0.1,
-                                                        'kernel': 'rbf'},
-                            'Immune system disorders': {'C': 10,
-                                                        'gamma': 0.1,
-                                                        'kernel': 'rbf'},
-                            'Infections and infestations': {'C': 10,
-                                                            'gamma': 0.1,
-                                                            'kernel': 'rbf'},
-                            'Injury, poisoning and procedural complications': {'C': 10,
-                                                                               'gamma': 0.1,
-                                                                               'kernel': 'rbf'},
-                            'Metabolism and nutrition disorders': {'C': 10,
-                                                                   'gamma': 0.1,
-                                                                   'kernel': 'rbf'},
-                            'Musculoskeletal and connective tissue disorders': {'C': 10,
-                                                                                'gamma': 0.1,
-                                                                                'kernel': 'rbf'},
-                            'Neoplasms benign, malignant and unspecified (incl cysts and polyps)': {'C': 10,
-                                                                                                    'gamma': 0.1,
-                                                                                                    'kernel': 'rbf'},
-                            'Nervous system disorders': {'C': 100,
-                                                         'gamma': 0.1,
-                                                         'kernel': 'rbf'},
-                            'Pregnancy, puerperium and perinatal conditions': {'C': 10,
-                                                                               'gamma': 0.1,
-                                                                               'kernel': 'rbf'},
-                            'Psychiatric disorders': {'C': 10,
-                                                      'gamma': 0.1,
-                                                      'kernel': 'rbf'},
-                            'Renal and urinary disorders': {'C': 100,
-                                                            'gamma': 0.1,
-                                                            'kernel': 'rbf'},
-                            'Reproductive system and breast disorders': {'C': 10,
-                                                                         'gamma': 0.1,
-                                                                         'kernel': 'rbf'},
-                            'Respiratory, thoracic and mediastinal disorders': {'C': 10,
-                                                                                'gamma': 0.1,
-                                                                                'kernel': 'rbf'},
-                            'Skin and subcutaneous tissue disorders': {'C': 10,
-                                                                       'gamma': 0.1,
-                                                                       'kernel': 'rbf'},
-                            'Surgical and medical procedures': {'C': 0.1,
-                                                                'gamma': 0.0001,
-                                                                'kernel': 'linear'},
-                            'Vascular disorders': {'C': 10,
-                                                   'gamma': 0.1,
-                                                   'kernel': 'rbf'}}
+'''

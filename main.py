@@ -3,6 +3,7 @@ from params_by_label import *
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
+import xgboost as xgb
 
 # Fixing the seed
 seed = 6
@@ -50,6 +51,7 @@ train_series_dic_bal, y_dic_bal = balance_dataset(X_train_dic, y_train_dic, out_
 
 # ML MODELS
 # SVC
+print("SVC")
 print("Base SVC without balancing:")
 base_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="auto", random_state=seed), cv=10,
                                   n_jobs=-2, verbose=True)
@@ -61,7 +63,7 @@ base_bal_svc_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names
                                       cv=10,
                                       n_jobs=-2, verbose=True)
 ax2 = base_bal_svc_report.plot.barh(y=["F1", "Recall", "Precision"])
-diff_bal = base_bal_svc_report - base_svc_report
+diff_bal_svc = base_bal_svc_report - base_svc_report
 
 # params_to_test = {"kernel": ["linear", "rbf"], "C": [0.01, 0.1, 1, 10, 100], "gamma": [0.0001, 0.001, 0.01, 0.1, 1]}
 # best_svc_params_by_label = multi_label_grid_search(train_series_dic_bal, y_dic_bal, out_names, SVC(gamma="auto", random_state=seed),
@@ -72,11 +74,12 @@ print("Improved SVC with balancing:")
 impr_bal_svc_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names, SVC(random_state=seed),
                                       modelname="SVC", spec_params=best_svc_params_by_label, cv=10, n_jobs=-2,
                                       verbose=True)
-diff_impr = impr_bal_svc_report - base_bal_svc_report
-ax2 = diff_impr.plot.barh()
+diff_impr_svc = impr_bal_svc_report - base_bal_svc_report
+# ax2 = diff_impr.plot.barh()
 
 # RF
 print()
+print("Random Forest")
 print("Base RF without balancing:")
 base_rf_report = cv_multi_report(X_train_dic, y_train, out_names,
                                  RandomForestClassifier(n_estimators=100, random_state=seed), cv=10, n_jobs=-2,
@@ -88,7 +91,7 @@ base_bal_rf_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names,
                                      RandomForestClassifier(n_estimators=100, random_state=seed), cv=10, n_jobs=-2,
                                      verbose=True)
 diff_bal_rf = base_bal_rf_report - base_rf_report
-ax3 = diff_bal_rf.plot.barh()
+# ax3 = diff_bal_rf.plot.barh()
 
 # Random
 n_estimators = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
@@ -123,15 +126,24 @@ impr_bal_RF_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names,
                                      spec_params=best_RF_params_by_label_grid, cv=10, n_jobs=-2, verbose=True)
 
 diff_impr_rf = impr_bal_RF_report - base_bal_rf_report
-ax2 = diff_impr_rf.plot.barh()
+# ax2 = diff_impr_rf.plot.barh()
 
-'''
-# Test XGbBoost
+
+# XGBoost
 print()
+print("XGBoost")
 print("Base XGBoost:")
-base_xgb = xgb.XGBClassifier(objective="binary:logistic", random_state=seed).fit(X_train, y_train)
-y_pred = base_xgb.predict(X_test)
-score_report(base_xgb, X_test, y_test)
+base_xgb_report = cv_multi_report(X_train_dic, y_train, out_names,
+                                  xgb.XGBClassifier(objective="binary:logistic", random_state=seed), cv=10, n_jobs=-2,
+                                  verbose=True)
+
+print()
+print("Base XGBoost with balancing:")
+base_bal_xgb_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names,
+                                      xgb.XGBClassifier(objective="binary:logistic", random_state=seed), cv=10,
+                                      n_jobs=-2, verbose=True)
+diff_bal_xgb = base_bal_xgb_report - base_xgb_report
+diff_bal_xgb.plot.barh()
 
 eta = [0.05, 0.1, 0.2, 0.3]
 min_child_weight = [1, 3, 5]
@@ -146,29 +158,9 @@ params = {"eta": eta,
           "subsample": subsample,
           "colsample_bytree": colsample_bytree
           }
-best_random_xgb = random_search(X_train, X_test, y_train, y_test,
-                                xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
-                                grid=params, n_iter=300, cv=3, scoring="f1", n_jobs=-2, verbose=True)
-# {"subsample": 1, "min_child_weight": 1, "max_depth": 12, "gamma": 0, "eta": 0.1, "colsample_bytree": 0.1}
-eta = [0.01, 0.02, 0.03, 0.04]
-min_child_weight = [6]
-max_depth = [8]
-gamma = [0.2]
-subsample = [0.8]
-colsample_bytree = [0.3]
-params_grid = {"eta": eta,
-               "min_child_weight": min_child_weight,
-               "max_depth": max_depth,
-               "gamma": gamma,
-               "subsample": subsample,
-               "colsample_bytree": colsample_bytree
-               }
 
-best_rf = grid_search(X_train, X_test, y_train, y_test,
-                      xgb.XGBClassifier(objective="binary:logistic", random_state=seed), params_grid, cv=10,
-                      scoring="f1", n_jobs=-2, verbose=True)
-# {"colsample_bytree": 0.3, "eta": 0.05, "gamma": 0.3, "max_depth": 9, "min_child_weight": 5, "subsample": 0.8}
-# {"colsample_bytree": 0.3, "eta": 0.04, "gamma": 0.2, "max_depth": 8, "min_child_weight": 6, "subsample": 0.8}
-# {"colsample_bytree": 0.3, "eta": 0.03, "gamma": 0.2, "max_depth": 8, "min_child_weight": 6, "subsample": 0.8}
-# {"colsample_bytree": 0.3, "eta": 0.01, "gamma": 0.2, "max_depth": 8, "min_child_weight": 6, "subsample": 0.8}
-'''
+xgb_grid_label = {name: params for name in out_names}
+
+best_random_xgb = multi_label_random_search(train_series_dic_bal, y_dic_bal, out_names,
+                                            xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
+                                            xgb_grid_label, n_iter=500, cv=5, scoring="f1", n_jobs=-3, verbose=True)

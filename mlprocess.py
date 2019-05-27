@@ -8,8 +8,9 @@ from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, \
     accuracy_score, roc_auc_score
 import matplotlib.pyplot as plt
-from imblearn.over_sampling import BorderlineSMOTE
+from imblearn.over_sampling import BorderlineSMOTE, SMOTENC
 from collections import Counter
+from tqdm import tqdm
 
 
 def create_original_df(write=False):
@@ -144,7 +145,7 @@ def select_best_descriptors_multi(df_desc, y_all, out_names=[], score_func=f_cla
         print("Column names necessary")
         return None
     selected = []
-    for n in out_names:
+    for n in tqdm(out_names):
         skb = SelectKBest(score_func=score_func, k=k).fit(df_desc, y_all[n])
         n_sel_bol = skb.get_support()
         sel = df_desc.loc[:, n_sel_bol].columns.to_list()
@@ -174,7 +175,7 @@ def create_dataframes_dic(df_desc_base_train, df_desc_base_test, X_train_fp, X_t
     selected_name = {name: None for name in out_names}
 
     # For each of the tasks build the train and test dataframe with the selected descriptors
-    for name in out_names:
+    for name in tqdm(out_names):
         # Select best descriptors for the task
         sel_col = select_best_descriptors(df_desc_base_train, y_train[name], score_func=score_func, k=k)
         selected_name[name] = sel_col  # Keep track of selected columns
@@ -190,18 +191,18 @@ def create_dataframes_dic(df_desc_base_train, df_desc_base_test, X_train_fp, X_t
     return train_series_dic, test_series_dic, selected_name
 
 
-# Over-sampling with SMOT borderline-2 (comparison: https://run.unl.pt/bitstream/10362/31307/1/TEGI0396.pdf)
 def balance_dataset(X_train_dic, y_train_dic, out_names, random_state=0, n_jobs=-1, verbose=False):
-    # Initialize the dictionaries
+    # Initialize the dictionaries and boolean array for categorical features
     train_series_dic_bal = {name: None for name in out_names}
     y_dic_bal = {name: None for name in out_names}
+    cat_shape = np.full((1128, ), True, dtype=bool)
+    cat_shape[-3:] = False
 
     # For each classficiation label
-    for label in out_names:
+    for label in tqdm(out_names):
         X_imb = X_train_dic[label]
         y_imb = y_train_dic[label]
-        X_bal, y_bal = BorderlineSMOTE(random_state=random_state, kind="borderline-2", n_jobs=n_jobs).fit_resample(
-            X_imb, y_imb)
+        X_bal, y_bal = SMOTENC(categorical_features=cat_shape, random_state=random_state, n_jobs=n_jobs).fit_resample(X_imb, y_imb)
         train_series_dic_bal[label] = X_bal
         y_dic_bal[label] = y_bal
 
@@ -313,14 +314,14 @@ def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_te
 
     # If X_test and y_test is given so that generalization evalutation can happen
     if X_test and y_test:
-        for label in out_names:
+        for label in tqdm(out_names):
             print(f"Scores for {label}")
             best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test[label],
                                          X_test[label], y_test[label], cv=cv, scoring=scoring, verbose=verbose,
                                          n_jobs=n_jobs)
             best_params_by_label[label] = best_params
     else:
-        for label in out_names:
+        for label in tqdm(out_names):
             print(f"Scores for {label}")
             best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test[label], cv=cv,
                                          scoring=scoring, verbose=verbose, n_jobs=n_jobs)
@@ -390,14 +391,14 @@ def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_
 
     # If X_test and y_test is given so that generalization evalutation can happen
     if X_test and y_test:
-        for label in out_names:
+        for label in tqdm(out_names):
             print(f"Scores for {label}")
             best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test[label],
                                            X_test[label], y_test[label], n_iter=n_iter, cv=cv, scoring=scoring,
                                            verbose=verbose, n_jobs=n_jobs)
             best_params_by_label[label] = best_params
     else:
-        for label in out_names:
+        for label in tqdm(out_names):
             print(f"Scores for {label}")
             best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test[label],
                                            n_iter=n_iter, cv=cv, scoring=scoring, verbose=verbose, n_jobs=n_jobs)

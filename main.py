@@ -46,6 +46,8 @@ y_train_dic = {name: y_train[name] for name in out_names}
 # counts.plot(kind='bar', figsize = (14,8), title="Counts of Side Effects")
 
 # Balancing the datasets for each label
+print()
+print("Balancing datasets")
 train_series_dic_bal, y_dic_bal = balance_dataset(X_train_dic, y_train_dic, out_names, random_state=seed, n_jobs=-2,
                                                   verbose=True)
 
@@ -62,7 +64,6 @@ print("Base SVC with balancing:")
 base_bal_svc_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names, SVC(gamma="auto", random_state=seed),
                                       cv=10,
                                       n_jobs=-2, verbose=True)
-ax2 = base_bal_svc_report.plot.barh(y=["F1", "Recall", "Precision"])
 diff_bal_svc = base_bal_svc_report - base_svc_report
 
 # params_to_test = {"kernel": ["linear", "rbf"], "C": [0.01, 0.1, 1, 10, 100], "gamma": [0.0001, 0.001, 0.01, 0.1, 1]}
@@ -143,14 +144,14 @@ base_bal_xgb_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names
                                       xgb.XGBClassifier(objective="binary:logistic", random_state=seed), cv=10,
                                       n_jobs=-2, verbose=True)
 diff_bal_xgb = base_bal_xgb_report - base_xgb_report
-diff_bal_xgb.plot.barh()
+# diff_bal_xgb.plot.barh()
 
-eta = [0.05, 0.1, 0.2, 0.3]
+eta = [0.05, 0.1, 0.2]
 min_child_weight = [1, 3, 5]
-max_depth = [3, 6, 9, 12]
-gamma = [0, 0.2, 0.4]
-subsample = [0.1, 0.5, 1]
-colsample_bytree = [0.1, 0.5, 1]
+max_depth = [3, 5, 7, 9]
+gamma = [0, 0.1, 0.2, 0.3, 0.4]
+subsample = [0.6, 0.7, 0.8, 0.9]
+colsample_bytree = [0.6, 0.7, 0.8, 0.9]
 params = {"eta": eta,
           "min_child_weight": min_child_weight,
           "max_depth": max_depth,
@@ -161,6 +162,15 @@ params = {"eta": eta,
 
 xgb_grid_label = {name: params for name in out_names}
 
-best_random_xgb = multi_label_random_search(train_series_dic_bal, y_dic_bal, out_names,
-                                            xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
-                                            xgb_grid_label, n_iter=500, cv=5, scoring="f1", n_jobs=-3, verbose=True)
+#best_random_xgb = multi_label_random_search(train_series_dic_bal, y_dic_bal, out_names,
+#                                            xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
+#                                            xgb_grid_label, n_iter=300, cv=5, scoring="f1", n_jobs=-2, verbose=True)
+
+print()
+print("Improved XGB with balancing:")
+impr_bal_xgb_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names,
+                                      xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
+                                      modelname="XGB", spec_params=best_random_xgb, cv=10, n_jobs=-2, verbose=True)
+
+diff_impr_xgb = impr_bal_xgb_report - base_bal_xgb_report
+# ax2 = diff_impr_rf.plot.barh()

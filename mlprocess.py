@@ -8,7 +8,7 @@ from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, \
     accuracy_score, roc_auc_score
 import matplotlib.pyplot as plt
-from imblearn.over_sampling import BorderlineSMOTE, SMOTENC
+from imblearn.over_sampling import SMOTENC
 from collections import Counter
 from tqdm import tqdm
 
@@ -227,9 +227,11 @@ def cv_multi_report(X_train_dic, y_train, out_names, model, modelname=None, spec
     # For each label
     for name in out_names:
         if verbose:
+            print()
             print(f"Scores for {name}")
         # Calculate the score for the current label using the respective dataframe
         if spec_params:
+            # Define the specific parameters for each model for each label
             if modelname == "SVC":
                 model_temp = model
                 model_temp.set_params(C=spec_params[name]["C"],
@@ -243,8 +245,16 @@ def cv_multi_report(X_train_dic, y_train, out_names, model, modelname=None, spec
                                       min_samples_leaf=spec_params[name]["min_samples_leaf"],
                                       min_samples_split=spec_params[name]["min_samples_split"],
                                       n_estimators=spec_params[name]["n_estimators"])
+            elif modelname == "XGB":
+                model_temp = model
+                model_temp.set_params(colsample_bytree=spec_params[name]["colsample_bytree"],
+                                      eta=spec_params[name]["eta"],
+                                      gamma=spec_params[name]["gamma"],
+                                      max_depth=spec_params[name]["max_depth"],
+                                      min_child_weight=spec_params[name]["min_child_weight"],
+                                      subsample=spec_params[name]["subsample"])
             else:
-                print("Please specify used model (SVC, RF)")
+                print("Please specify used model (SVC, RF, XGB)")
                 return None
             scores = cv_report(model_temp, X_train_dic[name], y_train[name], cv=cv, scoring_metrics=scoring_metrics,
                                n_jobs=n_jobs, verbose=verbose)
@@ -315,6 +325,7 @@ def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_te
     # If X_test and y_test is given so that generalization evalutation can happen
     if X_test and y_test:
         for label in tqdm(out_names):
+            print()
             print(f"Scores for {label}")
             best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test[label],
                                          X_test[label], y_test[label], cv=cv, scoring=scoring, verbose=verbose,
@@ -322,6 +333,7 @@ def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_te
             best_params_by_label[label] = best_params
     else:
         for label in tqdm(out_names):
+            print()
             print(f"Scores for {label}")
             best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test[label], cv=cv,
                                          scoring=scoring, verbose=verbose, n_jobs=n_jobs)
@@ -392,6 +404,7 @@ def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_
     # If X_test and y_test is given so that generalization evalutation can happen
     if X_test and y_test:
         for label in tqdm(out_names):
+            print()
             print(f"Scores for {label}")
             best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test[label],
                                            X_test[label], y_test[label], n_iter=n_iter, cv=cv, scoring=scoring,
@@ -399,6 +412,7 @@ def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_
             best_params_by_label[label] = best_params
     else:
         for label in tqdm(out_names):
+            print()
             print(f"Scores for {label}")
             best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test[label],
                                            n_iter=n_iter, cv=cv, scoring=scoring, verbose=verbose, n_jobs=n_jobs)

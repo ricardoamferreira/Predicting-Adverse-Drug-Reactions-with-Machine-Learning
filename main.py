@@ -173,4 +173,5 @@ impr_bal_xgb_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names
                                       modelname="XGB", spec_params=best_random_xgb, cv=10, n_jobs=-2, verbose=True)
 
 diff_impr_xgb = impr_bal_xgb_report - base_bal_xgb_report
-# ax2 = diff_impr_rf.plot.barh()
+xg1 = impr_bal_xgb_report.plot.barh(y=["F1","Recall"])
+xg2 = diff_impr_xgb.plot.barh()

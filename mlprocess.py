@@ -11,7 +11,9 @@ import matplotlib.pyplot as plt
 from imblearn.over_sampling import SMOTENC
 from collections import Counter
 from tqdm import tqdm
-
+import xgboost as xgb
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 
 def create_original_df(write=False):
     # Create dataframe from csv
@@ -217,7 +219,7 @@ def balance_dataset(X_train_dic, y_train_dic, out_names, random_state=0, n_jobs=
     return train_series_dic_bal, y_dic_bal
 
 
-def cv_multi_report(X_train_dic, y_train, out_names, model, modelname=None, spec_params=None, cv=10, n_jobs=-1,
+def cv_multi_report(X_train_dic, y_train, out_names, model=None, modelname=None, spec_params=None, random_state=None, cv=10, n_jobs=-1,
                     verbose=False):
     # Creates a scores report dataframe for each classification label with cv
     # Initizalize the dataframe
@@ -232,21 +234,21 @@ def cv_multi_report(X_train_dic, y_train, out_names, model, modelname=None, spec
         # Calculate the score for the current label using the respective dataframe
         if spec_params:
             # Define the specific parameters for each model for each label
-            if modelname == "SVC":
-                model_temp = model
+            if modelname[name] == "SVC":
+                model_temp = SVC(random_state=random_state)
                 model_temp.set_params(C=spec_params[name]["C"],
                                       gamma=spec_params[name]["gamma"],
                                       kernel=spec_params[name]["kernel"])
-            elif modelname == "RF":
-                model_temp = model
+            elif modelname[name] == "RF":
+                model_temp = RandomForestClassifier(n_estimators=100, random_state=random_state)
                 model_temp.set_params(bootstrap=spec_params[name]["bootstrap"],
                                       max_depth=spec_params[name]["max_depth"],
                                       max_features=spec_params[name]["max_features"],
                                       min_samples_leaf=spec_params[name]["min_samples_leaf"],
                                       min_samples_split=spec_params[name]["min_samples_split"],
                                       n_estimators=spec_params[name]["n_estimators"])
-            elif modelname == "XGB":
-                model_temp = model
+            elif modelname[name] == "XGB":
+                model_temp = xgb.XGBClassifier(objective="binary:logistic", random_state=random_state)
                 model_temp.set_params(colsample_bytree=spec_params[name]["colsample_bytree"],
                                       eta=spec_params[name]["eta"],
                                       gamma=spec_params[name]["gamma"],

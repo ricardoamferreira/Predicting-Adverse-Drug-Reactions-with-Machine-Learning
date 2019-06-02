@@ -52,31 +52,37 @@ modelnamexgb = {name: "XGB" for name in out_names}
 
 # Balancing the datasets for each label
 
-#print()
-#print("Balancing datasets")
-#train_series_dic_bal, y_dic_bal = balance_dataset(X_train_dic, y_train_dic, out_names, random_state=seed, n_jobs=-2,
-  #                                                verbose=True)
+# print()
+# print("Balancing datasets")
+# train_series_dic_bal, y_dic_bal = balance_dataset(X_train_dic, y_train_dic, out_names, random_state=seed, n_jobs=-2,
+#                                                verbose=True)
 
 # ML MODELS
 # SVC
 print("SVC")
 print("Base SVC without balancing:")
-base_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="auto", random_state=seed), n_splits=5, n_jobs=-2, verbose=True)
+base_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="auto", random_state=seed), n_splits=5,
+                                  n_jobs=-2, verbose=True)
 # ax = base_svc_report.plot.barh(y=["F1", "Recall", "Precision"])
 
 print()
 print("Base SVC with balancing:")
 base_bal_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="auto", random_state=seed),
-                                      balancing=True, n_splits = 5, n_jobs=-2, verbose=True)
+                                      balancing=True, n_splits=5, n_jobs=-2, verbose=True)
 diff_bal_svc = base_bal_svc_report - base_svc_report
+diff_bal_svc.plot(kind="barh", y="F1")
 
-
+# Searching best parameters
+params_to_test = {"svc__kernel": ["linear", "rbf"], "svc__C": [0.01, 0.1, 1, 10, 100],
+                  "svc__gamma": [0.0001, 0.001, 0.01, 0.1, 1]}
+d_params_to_test = {name: params_to_test for name in out_names}
+best_svc_params_by_label = multi_label_grid_search(X_train_dic, y_train, out_names,
+                                                   SVC(gamma="auto", random_state=seed), d_params_to_test,
+                                                   balancing=True, n_splits=5, scoring="f1", n_jobs=-2, verbose=True,
+                                                   random_state=seed)
 
 # No changes done after this yet for balacing changes
 
-# params_to_test = {"kernel": ["linear", "rbf"], "C": [0.01, 0.1, 1, 10, 100], "gamma": [0.0001, 0.001, 0.01, 0.1, 1]}
-# best_svc_params_by_label = multi_label_grid_search(train_series_dic_bal, y_dic_bal, out_names, SVC(gamma="auto", random_state=seed),
-# params_to_test, cv=5, scoring="f1", n_jobs=-2, verbose=True)
 
 print()
 print("Improved SVC with balancing:")
@@ -222,7 +228,6 @@ ax = scores_best_model.sort_values(by=["F1"]).plot(kind="barh", y=["Recall", "F1
 for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.get_x() + p.get_width(), p.get_y()),
                                  xytext=(30, 0), textcoords='offset points', horizontalalignment='right')
 
-
 # Test scores for each label
 test_scores_best_model = test_score_multi_report(train_series_dic_bal, y_dic_bal, X_test_dic, y_test, out_names,
                                                  modelname=best_model_by_label, spec_params=best_model_params_by_label,
@@ -230,9 +235,6 @@ test_scores_best_model = test_score_multi_report(train_series_dic_bal, y_dic_bal
 
 for l, df in X_test_dic.items():
     df.columns = np.arange(len(df.columns))
-
-
-
 
 train_series_dic_bal["Congenital, familial and genetic disorders"]
 X_test_dic["Congenital, familial and genetic disorders"]

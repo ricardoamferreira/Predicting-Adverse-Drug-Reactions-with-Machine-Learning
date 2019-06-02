@@ -222,10 +222,25 @@ def balance_dataset(X_train_dic, y_train_dic, out_names, random_state=0, n_jobs=
     return train_series_dic_bal, y_dic_bal
 
 
-def grid_search(X_train, y_train, model, params_to_test, X_test=None, y_test=None, cv=10, scoring="f1", n_jobs=-1,
-                verbose=False):
+def grid_search(X_train, y_train, model, params_to_test, X_test=None, y_test=None, balancing=False, n_splits=5,
+                scoring="f1", n_jobs=-1, verbose=False, random_state=None):
     # Define grid search
-    grid_search = GridSearchCV(model, params_to_test, cv=cv, n_jobs=n_jobs, verbose=verbose, scoring=scoring)
+    if balancing:
+        # Save index of categorical features
+        cat_shape = np.full((1128,), True, dtype=bool)
+        cat_shape[-3:] = False
+        # Prepatre SMOTENC
+        smotenc = SMOTENC(categorical_features=cat_shape, random_state=random_state, n_jobs=n_jobs)
+        # Make a pipeline with the balancing and the estimator, balacing is only called when fitting
+        pipeline = make_pipeline(smotenc, model)
+        # Determine stratified k folds
+        kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
+        # Call cross validate
+        grid_search = GridSearchCV(pipeline, params_to_test, cv=kf, n_jobs=n_jobs, verbose=verbose, scoring=scoring)
+
+    else:
+        kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
+        grid_search = GridSearchCV(model, params_to_test, cv=kf, n_jobs=n_jobs, verbose=verbose, scoring=scoring)
 
     # Fit X and y to test parameters
     grid_search.fit(X_train, y_train)
@@ -268,8 +283,8 @@ def grid_search(X_train, y_train, model, params_to_test, X_test=None, y_test=Non
     return best_params, best_estimator
 
 
-def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_test, X_test=None, y_test=None, cv=10,
-                            scoring="f1", n_jobs=-1, verbose=False):
+def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_test, balancing=False, X_test=None,
+                            y_test=None, n_splits=5, scoring="f1", n_jobs=-1, verbose=False, random_state = None):
     # Creates a dictionary with the best params in regards to chosen metric for each label
 
     # Creates the dictionary
@@ -281,15 +296,16 @@ def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_te
             print()
             print(f"Scores for {label}")
             best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test[label],
-                                         X_test[label], y_test[label], cv=cv, scoring=scoring, verbose=verbose,
-                                         n_jobs=n_jobs)
+                                         X_test[label], y_test[label], n_splits=n_splits, scoring=scoring,
+                                         verbose=verbose, n_jobs=n_jobs, balancing=balancing, random_state=random_state)
             best_params_by_label[label] = best_params
     else:
         for label in tqdm(out_names):
             print()
             print(f"Scores for {label}")
-            best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test[label], cv=cv,
-                                         scoring=scoring, verbose=verbose, n_jobs=n_jobs)
+            best_params, _ = grid_search(X_train_dic[label], y_train[label], model, params_to_test[label],
+                                         n_splits=n_splits, scoring=scoring, verbose=verbose, n_jobs=n_jobs,
+                                         balancing=balancing, random_state=random_state)
             best_params_by_label[label] = best_params
 
     return best_params_by_label

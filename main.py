@@ -70,7 +70,9 @@ base_bal_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma
                                       balancing=True, n_splits = 5, n_jobs=-2, verbose=True)
 diff_bal_svc = base_bal_svc_report - base_svc_report
 
-# No changes done after this yet
+
+
+# No changes done after this yet for balacing changes
 
 # params_to_test = {"kernel": ["linear", "rbf"], "C": [0.01, 0.1, 1, 10, 100], "gamma": [0.0001, 0.001, 0.01, 0.1, 1]}
 # best_svc_params_by_label = multi_label_grid_search(train_series_dic_bal, y_dic_bal, out_names, SVC(gamma="auto", random_state=seed),

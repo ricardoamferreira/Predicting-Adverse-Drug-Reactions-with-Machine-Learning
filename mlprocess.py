@@ -419,19 +419,22 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
               scoring_metrics=("f1", "roc_auc", "recall", "precision", "accuracy"), random_state=None, n_jobs=-1,
               verbose=False):
     if balancing:
+        # Save index of categorical features
         cat_shape = np.full((1128,), True, dtype=bool)
         cat_shape[-3:] = False
+        # Prepatre SMOTENC
         smotenc = SMOTENC(categorical_features=cat_shape, random_state=random_state, n_jobs=n_jobs)
+        # Make a pipeline with the balancing and the estimator, balacing is only called when fitting
         pipeline = make_pipeline(smotenc, estimator)
-
-        kf = StratifiedKFold(n_splits=n_splits)
-
+        # Determine stratified k folds
+        kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
+        # Call cross validate
         scores = cross_validate(pipeline, X_train, y_train, scoring=scoring_metrics, cv=kf, n_jobs=n_jobs,
                                 verbose=verbose, return_train_score=False)
 
     else:
-        # Cross validation
-        kf = StratifiedKFold(n_splits=n_splits)
+        # Normal cross validation
+        kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
         scores = cross_validate(estimator, X_train, y_train, scoring=scoring_metrics, cv=kf, n_jobs=n_jobs,
                                 verbose=verbose, return_train_score=False)
 
@@ -502,9 +505,11 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
             else:
                 print("Please specify used model (SVC, RF, XGB)")
                 return None
-            scores = cv_report(model_temp, X_train_dic[name], y_train[name], balancing=balancing, n_splits=n_splits, scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose)
+            scores = cv_report(model_temp, X_train_dic[name], y_train[name], balancing=balancing, n_splits=n_splits,
+                               scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose)
         else:
-            scores = cv_report(model, X_train_dic[name], y_train[name], balancing=balancing, n_splits=n_splits, scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose)
+            scores = cv_report(model, X_train_dic[name], y_train[name], balancing=balancing, n_splits=n_splits,
+                               scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose)
 
         report.loc[name, "F1"] = round(float(scores["f1_score"]), 3)
         report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)

@@ -212,3 +212,5 @@ for label in out_names:
 scores_best_model = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names, modelname=best_model_by_label,
                                     spec_params=best_model_params_by_label, random_state=seed, cv=10, n_jobs=-2,
                                     verbose=True)
+ax = scores_best_model.sort_values(by=["F1"]).plot(kind = "barh", y=["Recall","F1"], title = "Best scores by label", xticks = [0.5,0.6,0.7,0.8,0.9,1], legend = "reverse", xlim = (0.5,1))
+for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(),3)), (p.get_x() + p.get_width(), p.get_y()), xytext=(30, 0), textcoords='offset points', horizontalalignment='right')

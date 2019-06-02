@@ -268,6 +268,7 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, modelname=None,
         report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)
         report.loc[name, "Precision"] = round(float(scores["prec_score"]), 3)
         report.loc[name, "Accuracy"] = round(float(scores["acc_score"]), 3)
+    report = report.apply(pd.to_numeric)
     return report
 
 

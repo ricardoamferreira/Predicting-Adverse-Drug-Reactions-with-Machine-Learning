@@ -3,7 +3,7 @@ import numpy as np
 import create_fingerprints as cf
 import create_descriptors as cd
 from rdkit import Chem
-from sklearn.model_selection import GridSearchCV, cross_validate, RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV, cross_validate, RandomizedSearchCV, StratifiedKFold
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, \
     accuracy_score, roc_auc_score
@@ -14,6 +14,8 @@ from tqdm import tqdm
 import xgboost as xgb
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
+from imblearn.pipeline import make_pipeline
+
 
 def create_original_df(write=False):
     # Create dataframe from csv
@@ -197,14 +199,15 @@ def balance_dataset(X_train_dic, y_train_dic, out_names, random_state=0, n_jobs=
     # Initialize the dictionaries and boolean array for categorical features
     train_series_dic_bal = {name: None for name in out_names}
     y_dic_bal = {name: None for name in out_names}
-    cat_shape = np.full((1128, ), True, dtype=bool)
+    cat_shape = np.full((1128,), True, dtype=bool)
     cat_shape[-3:] = False
 
     # For each classficiation label
     for label in tqdm(out_names):
         X_imb = X_train_dic[label]
         y_imb = y_train_dic[label]
-        X_bal, y_bal = SMOTENC(categorical_features=cat_shape, random_state=random_state, n_jobs=n_jobs).fit_resample(X_imb, y_imb)
+        X_bal, y_bal = SMOTENC(categorical_features=cat_shape, random_state=random_state, n_jobs=n_jobs).fit_resample(
+            X_imb, y_imb)
         train_series_dic_bal[label] = X_bal
         y_dic_bal[label] = y_bal
 
@@ -217,59 +220,6 @@ def balance_dataset(X_train_dic, y_train_dic, out_names, random_state=0, n_jobs=
 
     # Return the new dictionaries
     return train_series_dic_bal, y_dic_bal
-
-
-def cv_multi_report(X_train_dic, y_train, out_names, model=None, modelname=None, spec_params=None, random_state=None, cv=10, n_jobs=-1,
-                    verbose=False):
-    # Creates a scores report dataframe for each classification label with cv
-    # Initizalize the dataframe
-    report = pd.DataFrame(columns=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], index=out_names)
-    scoring_metrics = ("f1", "roc_auc", "recall", "precision", "accuracy")
-
-    # For each label
-    for name in out_names:
-        if verbose:
-            print()
-            print(f"Scores for {name}")
-        # Calculate the score for the current label using the respective dataframe
-        if spec_params:
-            # Define the specific parameters for each model for each label
-            if modelname[name] == "SVC":
-                model_temp = SVC(random_state=random_state)
-                model_temp.set_params(C=spec_params[name]["C"],
-                                      gamma=spec_params[name]["gamma"],
-                                      kernel=spec_params[name]["kernel"])
-            elif modelname[name] == "RF":
-                model_temp = RandomForestClassifier(n_estimators=100, random_state=random_state)
-                model_temp.set_params(bootstrap=spec_params[name]["bootstrap"],
-                                      max_depth=spec_params[name]["max_depth"],
-                                      max_features=spec_params[name]["max_features"],
-                                      min_samples_leaf=spec_params[name]["min_samples_leaf"],
-                                      min_samples_split=spec_params[name]["min_samples_split"],
-                                      n_estimators=spec_params[name]["n_estimators"])
-            elif modelname[name] == "XGB":
-                model_temp = xgb.XGBClassifier(objective="binary:logistic", random_state=random_state)
-                model_temp.set_params(colsample_bytree=spec_params[name]["colsample_bytree"],
-                                      eta=spec_params[name]["eta"],
-                                      gamma=spec_params[name]["gamma"],
-                                      max_depth=spec_params[name]["max_depth"],
-                                      min_child_weight=spec_params[name]["min_child_weight"],
-                                      subsample=spec_params[name]["subsample"])
-            else:
-                print("Please specify used model (SVC, RF, XGB)")
-                return None
-            scores = cv_report(model_temp, X_train_dic[name], y_train[name], cv=cv, scoring_metrics=scoring_metrics,
-                               n_jobs=n_jobs, verbose=verbose)
-        else:
-            scores = cv_report(model, X_train_dic[name], y_train[name], cv=cv, scoring_metrics=scoring_metrics,
-                               n_jobs=n_jobs, verbose=verbose)
-        report.loc[name, "F1"] = round(float(scores["f1_score"]), 3)
-        report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
-        report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)
-        report.loc[name, "Precision"] = round(float(scores["prec_score"]), 3)
-        report.loc[name, "Accuracy"] = round(float(scores["acc_score"]), 3)
-    report = report.apply(pd.to_numeric)
-    return report
 
 
 def grid_search(X_train, y_train, model, params_to_test, X_test=None, y_test=None, cv=10, scoring="f1", n_jobs=-1,
@@ -424,27 +374,10 @@ def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_
     return best_params_by_label
 
 
-def score_report(estimator, X_test, y_test):
+def score_report(estimator, X_test, y_test, verbose=False):
     # Predicting value
     y_true, y_pred = y_test, estimator.predict(X_test)
 
-    # Detailed Classification report
-    print()
-    print("The scores are computed on the full evaluation set")
-    print("These are not used to train or optimize the model")
-    print()
-    print("Detailed classification report:")
-    print(classification_report(y_true, y_pred))
-    print()
-    """
-    print("Confusion matrix as:")
-    print(
-           #TN FP
-           #FN TP
-           )
-    print(confusion_matrix(y_true, y_pred))
-    print()
-    """
     # Individual metrics
     f1 = f1_score(y_true, y_pred, average="macro")
     auc = roc_auc_score(y_true, y_pred, average="macro")
@@ -452,20 +385,55 @@ def score_report(estimator, X_test, y_test):
     prec = precision_score(y_true, y_pred, average="macro")
     acc = accuracy_score(y_true, y_pred)
 
-    print("Individual metrics:")
-    print(f"F1 score: {f1:.2f}")
-    print(f"ROC-AUC score: {auc:.2f}")
-    print(f"Recall score: {rec:.2f}")
-    print(f"Precision score: {prec:.2f}")
-    print(f"Accuracy score: {acc:.2f}")
-    print()
+    # Detailed Classification report
+    if verbose:
+        print()
+        print("The scores are computed on the full evaluation set")
+        print("These are not used to train or optimize the model")
+        print()
+        print("Detailed classification report:")
+        print(classification_report(y_true, y_pred))
+        print()
+        """
+        print("Confusion matrix as:")
+        print(
+               #TN FP
+               #FN TP
+               )
+        print(confusion_matrix(y_true, y_pred))
+        print()
+        """
+
+        print("Individual metrics:")
+        print(f"F1 score: {f1:.3f}")
+        print(f"ROC-AUC score: {auc:.3f}")
+        print(f"Recall score: {rec:.3f}")
+        print(f"Precision score: {prec:.3f}")
+        print(f"Accuracy score: {acc:.3f}")
+        print()
+
+        return {"f1_score": f1, "auc_score": auc, "rec_score": rec, "prec_score": prec, "acc_score": acc}
 
 
-def cv_report(estimator, X_train, y_train, cv=10, scoring_metrics=("f1", "roc_auc", "recall", "precision", "accuracy"),
-              n_jobs=-1, verbose=False):
-    # Cross validation
-    scores = cross_validate(estimator, X_train, y_train, scoring=scoring_metrics, cv=cv, n_jobs=n_jobs, verbose=verbose,
-                            return_train_score=False)
+def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
+              scoring_metrics=("f1", "roc_auc", "recall", "precision", "accuracy"), random_state=None, n_jobs=-1,
+              verbose=False):
+    if balancing:
+        cat_shape = np.full((1128,), True, dtype=bool)
+        cat_shape[-3:] = False
+        smotenc = SMOTENC(categorical_features=cat_shape, random_state=random_state, n_jobs=n_jobs)
+        pipeline = make_pipeline(smotenc, estimator)
+
+        kf = StratifiedKFold(n_splits=n_splits)
+
+        scores = cross_validate(pipeline, X_train, y_train, scoring=scoring_metrics, cv=kf, n_jobs=n_jobs,
+                                verbose=verbose, return_train_score=False)
+
+    else:
+        # Cross validation
+        kf = StratifiedKFold(n_splits=n_splits)
+        scores = cross_validate(estimator, X_train, y_train, scoring=scoring_metrics, cv=kf, n_jobs=n_jobs,
+                                verbose=verbose, return_train_score=False)
 
     # Means
     f1_s = np.mean(scores["test_f1"])
@@ -493,3 +461,108 @@ def cv_report(estimator, X_train, y_train, cv=10, scoring_metrics=("f1", "roc_au
 
     return {"f1_score": f1_s, "f1_std": f1_std, "auc_score": auc_s, "auc_std": auc_std, "rec_score": rec_s,
             "rec_std": rec_std, "prec_score": prec_s, "prec_std": prec_std, "acc_score": acc_s, "acc_std": acc_std}
+
+
+def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False, modelname=None, spec_params=None,
+                    random_state=None, n_splits=5, n_jobs=-1, verbose=False):
+    # Creates a scores report dataframe for each classification label with cv
+    # Initizalize the dataframe
+    report = pd.DataFrame(columns=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], index=out_names)
+    scoring_metrics = ("f1", "roc_auc", "recall", "precision", "accuracy")
+
+    # For each label
+    for name in tqdm(out_names):
+        if verbose:
+            print()
+            print(f"Scores for {name}")
+        # Calculate the score for the current label using the respective dataframe
+        if spec_params:
+            # Define the specific parameters for each model for each label
+            if modelname[name] == "SVC":
+                model_temp = SVC(random_state=random_state)
+                model_temp.set_params(C=spec_params[name]["C"],
+                                      gamma=spec_params[name]["gamma"],
+                                      kernel=spec_params[name]["kernel"])
+            elif modelname[name] == "RF":
+                model_temp = RandomForestClassifier(n_estimators=100, random_state=random_state)
+                model_temp.set_params(bootstrap=spec_params[name]["bootstrap"],
+                                      max_depth=spec_params[name]["max_depth"],
+                                      max_features=spec_params[name]["max_features"],
+                                      min_samples_leaf=spec_params[name]["min_samples_leaf"],
+                                      min_samples_split=spec_params[name]["min_samples_split"],
+                                      n_estimators=spec_params[name]["n_estimators"])
+            elif modelname[name] == "XGB":
+                model_temp = xgb.XGBClassifier(objective="binary:logistic", random_state=random_state)
+                model_temp.set_params(colsample_bytree=spec_params[name]["colsample_bytree"],
+                                      eta=spec_params[name]["eta"],
+                                      gamma=spec_params[name]["gamma"],
+                                      max_depth=spec_params[name]["max_depth"],
+                                      min_child_weight=spec_params[name]["min_child_weight"],
+                                      subsample=spec_params[name]["subsample"])
+            else:
+                print("Please specify used model (SVC, RF, XGB)")
+                return None
+            scores = cv_report(model_temp, X_train_dic[name], y_train[name], balancing=balancing, n_splits=n_splits, scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose)
+        else:
+            scores = cv_report(model, X_train_dic[name], y_train[name], balancing=balancing, n_splits=n_splits, scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose)
+
+        report.loc[name, "F1"] = round(float(scores["f1_score"]), 3)
+        report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
+        report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)
+        report.loc[name, "Precision"] = round(float(scores["prec_score"]), 3)
+        report.loc[name, "Accuracy"] = round(float(scores["acc_score"]), 3)
+    report = report.apply(pd.to_numeric)
+    return report
+
+
+def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, model=None, modelname=None,
+                            spec_params=None,
+                            random_state=None, verbose=False):
+    # Creates a scores report dataframe for each classification label with cv
+    # Initizalize the dataframe
+    report = pd.DataFrame(columns=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], index=out_names)
+
+    # For each label
+    for name in tqdm(out_names):
+        if verbose:
+            print()
+            print(f"Scores for {name}")
+        # Calculate the score for the current label using the respective dataframe
+        if spec_params:
+            # Define the specific parameters for each model for each label
+            if modelname[name] == "SVC":
+                model_temp = SVC(random_state=random_state)
+                model_temp.set_params(C=spec_params[name]["C"],
+                                      gamma=spec_params[name]["gamma"],
+                                      kernel=spec_params[name]["kernel"])
+            elif modelname[name] == "RF":
+                model_temp = RandomForestClassifier(n_estimators=100, random_state=random_state)
+                model_temp.set_params(bootstrap=spec_params[name]["bootstrap"],
+                                      max_depth=spec_params[name]["max_depth"],
+                                      max_features=spec_params[name]["max_features"],
+                                      min_samples_leaf=spec_params[name]["min_samples_leaf"],
+                                      min_samples_split=spec_params[name]["min_samples_split"],
+                                      n_estimators=spec_params[name]["n_estimators"])
+            elif modelname[name] == "XGB":
+                model_temp = xgb.XGBClassifier(objective="binary:logistic", random_state=random_state)
+                model_temp.set_params(colsample_bytree=spec_params[name]["colsample_bytree"],
+                                      eta=spec_params[name]["eta"],
+                                      gamma=spec_params[name]["gamma"],
+                                      max_depth=spec_params[name]["max_depth"],
+                                      min_child_weight=spec_params[name]["min_child_weight"],
+                                      subsample=spec_params[name]["subsample"])
+            else:
+                print("Please specify used model (SVC, RF, XGB)")
+                return None
+            model_temp.fit(X_train_dic[name], y_train[name])
+            scores = score_report(model_temp, X_test[name], y_test[name], verbose=verbose)
+        else:
+            model.fit(X_train_dic[name], y_train[name])
+            scores = score_report(model, X_test[name], y_test[name], verbose=verbose)
+        report.loc[name, "F1"] = round(float(scores["f1_score"]), 3)
+        report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
+        report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)
+        report.loc[name, "Precision"] = round(float(scores["prec_score"]), 3)
+        report.loc[name, "Accuracy"] = round(float(scores["acc_score"]), 3)
+    report = report.apply(pd.to_numeric)
+    return report

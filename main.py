@@ -73,12 +73,12 @@ diff_bal_svc = base_bal_svc_report - base_svc_report
 diff_bal_svc.plot(kind="barh", y="F1")
 
 # Searching best parameters
-params_to_test = {"svc__kernel": ["linear", "rbf"], "svc__C": [0.01, 0.1, 1, 10, 100],
-                  "svc__gamma": [0.0001, 0.001, 0.01, 0.1, 1]}
+params_to_test = {"svc__kernel": ["rbf"], "svc__C": [0.01, 0.1, 1, 10],
+                  "svc__gamma": [0.001, 0.01, 0.1, 1]}
 d_params_to_test = {name: params_to_test for name in out_names}
-best_svc_params_by_label = multi_label_grid_search(X_train_dic, y_train, out_names,
+best_svc_params_by_label = multi_label_grid_search(X_train_dic, y_train, out_names[5:10],
                                                    SVC(gamma="auto", random_state=seed), d_params_to_test,
-                                                   balancing=True, n_splits=5, scoring="f1", n_jobs=-2, verbose=True,
+                                                   balancing=True, n_splits=5, scoring="f1", n_jobs=-3, verbose=True,
                                                    random_state=seed)
 
 # No changes done after this yet for balacing changes

@@ -68,30 +68,24 @@ base_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="au
 print()
 print("Base SVC with balancing:")
 base_bal_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="auto", random_state=seed),
-                                      balancing=True, n_splits=5, n_jobs=-2, verbose=True)
+                                      balancing=True, n_splits=5, n_jobs=-2, verbose=True, random_state=seed)
 diff_bal_svc = base_bal_svc_report - base_svc_report
-diff_bal_svc.plot(kind="barh", y="F1")
+# diff_bal_svc.plot(kind="barh", y="F1")
 
 # Searching best parameters
-params_to_test = {"svc__kernel": ["rbf"], "svc__C": [0.01, 0.1, 1, 10],
-                  "svc__gamma": [0.001, 0.01, 0.1, 1]}
-d_params_to_test = {name: params_to_test for name in out_names}
-best_svc_params_by_label = multi_label_grid_search(X_train_dic, y_train, out_names[5:10],
-                                                   SVC(gamma="auto", random_state=seed), d_params_to_test,
-                                                   balancing=True, n_splits=5, scoring="f1", n_jobs=-3, verbose=True,
-                                                   random_state=seed)
-
-# No changes done after this yet for balacing changes
-
+# params_to_test = {"svc__kernel": ["rbf"], "svc__C": [0.01, 0.1, 1, 10],
+#                   "svc__gamma": [0.001, 0.01, 0.1, 1]}
+# d_params_to_test = {name: params_to_test for name in out_names}
+# best_SVC_params_by_label = multi_label_grid_search(X_train_dic, y_train, out_names,
+#                                                    SVC(gamma="auto", random_state=seed), d_params_to_test,
+#                                                    balancing=True, n_splits=5, scoring="f1", n_jobs=-3, verbose=True,
+#                                                    random_state=seed)
 
 print()
 print("Improved SVC with balancing:")
-impr_bal_svc_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names, SVC(random_state=seed),
-                                      modelname=modelnamesvc, spec_params=best_SVC_params_by_label, cv=10, n_jobs=-2,
-                                      verbose=True)
-impr_bal_svc_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names, modelname=modelnamesvc,
-                                      spec_params=best_SVC_params_by_label, random_state=seed, cv=10, n_jobs=-2,
-                                      verbose=True)
+impr_bal_svc_report = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamesvc,
+                                      spec_params=best_SVC_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
+                                      verbose=True, random_state=seed)
 diff_impr_svc = impr_bal_svc_report - base_bal_svc_report
 # ax2 = diff_impr.plot.barh()
 
@@ -100,37 +94,36 @@ print()
 print("Random Forest")
 print("Base RF without balancing:")
 base_rf_report = cv_multi_report(X_train_dic, y_train, out_names,
-                                 RandomForestClassifier(n_estimators=100, random_state=seed), cv=10, n_jobs=-2,
+                                 RandomForestClassifier(n_estimators=100, random_state=seed), n_splits=5, n_jobs=-2,
                                  verbose=True)
 
 print()
 print("Base RF with balancing:")
-base_bal_rf_report = cv_multi_report(train_series_dic_bal, y_dic_bal, out_names,
-                                     RandomForestClassifier(n_estimators=100, random_state=seed), cv=10, n_jobs=-2,
-                                     verbose=True)
+base_bal_rf_report = cv_multi_report(X_train_dic, y_train, out_names,
+                                     RandomForestClassifier(n_estimators=100, random_state=seed), balancing=True,
+                                     n_splits=5, n_jobs=-2, verbose=True, random_state=seed)
 diff_bal_rf = base_bal_rf_report - base_rf_report
 # ax3 = diff_bal_rf.plot.barh()
 
 # Random
 n_estimators = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
 max_features = ["log2", "sqrt"]
-max_depth = [50, 70, 90, 110, 130, 150, 170, 190, 210, 230, 250, None]
-min_samples_split = [2, 5, 10, 20]
-min_samples_leaf = [1, 2, 5, 10]
+max_depth = [50, 90, 130, 170, 210, 250]
+min_samples_split = [2, 5, 10]
+min_samples_leaf = [1]
 bootstrap = [True, False]
-rf_grid = {"n_estimators": n_estimators,
-           "max_features": max_features,
-           "max_depth": max_depth,
-           "min_samples_split": min_samples_split,
-           "min_samples_leaf": min_samples_leaf,
-           "bootstrap": bootstrap}
+rf_grid = {"randomforestclassifier__n_estimators": n_estimators,
+           "randomforestclassifier__max_features": max_features,
+           "randomforestclassifier__max_depth": max_depth,
+           "randomforestclassifier__min_samples_split": min_samples_split,
+           "randomforestclassifier__min_samples_leaf": min_samples_leaf,
+           "randomforestclassifier__bootstrap": bootstrap}
 rf_grid_label = {name: rf_grid for name in out_names}
+best_RF_params_by_label_random_main = multi_label_random_search(X_train_dic, y_train, out_names[10:15],
+                                                           RandomForestClassifier(random_state=seed), rf_grid_label,
+                                                           balancing=True, n_splits=3, scoring="f1", n_jobs=-2,
+                                                           verbose=True, random_state=seed, n_iter=200)
 
-#
-# best_RF_params_by_label_random = multi_label_random_search(train_series_dic_bal, y_dic_bal, out_names,
-#                                                     RandomForestClassifier(random_state=seed), rf_grid_label,
-#                                                     n_iter=300,
-#                                                     cv=5, scoring="f1", n_jobs=-2, verbose=True)
 #
 # best_RF_params_by_label_grid = multi_label_grid_search(train_series_dic_bal, y_dic_bal, out_names,
 #                                                        RandomForestClassifier(random_state=seed), rf_params_to_grid,

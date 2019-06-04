@@ -284,7 +284,7 @@ def grid_search(X_train, y_train, model, params_to_test, X_test=None, y_test=Non
 
 
 def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_test, balancing=False, X_test=None,
-                            y_test=None, n_splits=5, scoring="f1", n_jobs=-1, verbose=False, random_state = None):
+                            y_test=None, n_splits=5, scoring="f1", n_jobs=-1, verbose=False, random_state=None):
     # Creates a dictionary with the best params in regards to chosen metric for each label
 
     # Creates the dictionary
@@ -311,11 +311,27 @@ def multi_label_grid_search(X_train_dic, y_train, out_names, model, params_to_te
     return best_params_by_label
 
 
-def random_search(X_train, y_train, model, params_to_test, X_test=None, y_test=None, n_iter=100, cv=10, scoring="f1",
-                  n_jobs=-1, verbose=False):
+def random_search(X_train, y_train, model, params_to_test, X_test=None, y_test=None, balancing=False,
+                  n_iter=100, n_splits=5, scoring="f1", n_jobs=-1, verbose=False, random_state=None):
     # Define random search
-    rs = RandomizedSearchCV(model, params_to_test, n_iter=n_iter, cv=cv, n_jobs=n_jobs, verbose=verbose,
-                            scoring=scoring)
+    if balancing:
+        # Save index of categorical features
+        cat_shape = np.full((1128,), True, dtype=bool)
+        cat_shape[-3:] = False
+        # Prepatre SMOTENC
+        smotenc = SMOTENC(categorical_features=cat_shape, random_state=random_state, n_jobs=n_jobs)
+        # Make a pipeline with the balancing and the estimator, balacing is only called when fitting
+        pipeline = make_pipeline(smotenc, model)
+        # Determine stratified k folds
+        kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
+        # Call cross validate
+        rs = RandomizedSearchCV(pipeline, params_to_test, n_iter=n_iter, cv=kf, n_jobs=n_jobs, verbose=verbose,
+                                scoring=scoring)
+
+    else:
+        kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
+        rs = RandomizedSearchCV(model, params_to_test, n_iter=n_iter, cv=kf, n_jobs=n_jobs, verbose=verbose,
+                                scoring=scoring)
 
     # Fit parameters
     rs.fit(X_train, y_train)
@@ -363,8 +379,8 @@ def random_search(X_train, y_train, model, params_to_test, X_test=None, y_test=N
     return best_params, best_estimator
 
 
-def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_test, X_test=None, y_test=None,
-                              n_iter=300, cv=10, scoring="f1", n_jobs=-1, verbose=False):
+def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_test, balancing=False, X_test=None, y_test=None,
+                              n_iter=100, n_splits=5, scoring="f1", n_jobs=-1, verbose=False, random_state=None):
     # Creates a dictionary with the best params in regards to chosen metric for each label
 
     # Creates the dictionary
@@ -376,15 +392,17 @@ def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_
             print()
             print(f"Scores for {label}")
             best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test[label],
-                                           X_test[label], y_test[label], n_iter=n_iter, cv=cv, scoring=scoring,
-                                           verbose=verbose, n_jobs=n_jobs)
+                                           X_test[label], y_test[label], n_iter=n_iter, n_splits=n_splits,
+                                           scoring=scoring, verbose=verbose, n_jobs=n_jobs, random_state=random_state,
+                                           balancing=balancing)
             best_params_by_label[label] = best_params
     else:
         for label in tqdm(out_names):
             print()
             print(f"Scores for {label}")
             best_params, _ = random_search(X_train_dic[label], y_train[label], model, params_to_test[label],
-                                           n_iter=n_iter, cv=cv, scoring=scoring, verbose=verbose, n_jobs=n_jobs)
+                                           n_iter=n_iter, n_splits=n_splits, scoring=scoring, verbose=verbose,
+                                           n_jobs=n_jobs, random_state=random_state, balancing=balancing)
             best_params_by_label[label] = best_params
 
     return best_params_by_label
@@ -522,10 +540,12 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
                 print("Please specify used model (SVC, RF, XGB)")
                 return None
             scores = cv_report(model_temp, X_train_dic[name], y_train[name], balancing=balancing, n_splits=n_splits,
-                               scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose)
+                               scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose,
+                               random_state=random_state)
         else:
             scores = cv_report(model, X_train_dic[name], y_train[name], balancing=balancing, n_splits=n_splits,
-                               scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose)
+                               scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose,
+                               random_state=random_state)
 
         report.loc[name, "F1"] = round(float(scores["f1_score"]), 3)
         report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)

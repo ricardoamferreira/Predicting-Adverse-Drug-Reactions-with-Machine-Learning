@@ -334,7 +334,7 @@ def random_search(X_train, y_train, model, params_to_test, X_test=None, y_test=N
                                 scoring=scoring)
 
     # Fit parameters
-    rs.fit(X_train, y_train)
+    rs.fit(np.asarray(X_train), np.asarray(y_train))
     means = rs.cv_results_["mean_test_score"]
     stds = rs.cv_results_["std_test_score"]
 

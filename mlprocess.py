@@ -463,13 +463,13 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
         # Determine stratified k folds
         kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
         # Call cross validate
-        scores = cross_validate(pipeline, X_train, y_train, scoring=scoring_metrics, cv=kf, n_jobs=n_jobs,
+        scores = cross_validate(pipeline, np.asarray(X_train), np.asarray(y_train), scoring=scoring_metrics, cv=kf, n_jobs=n_jobs,
                                 verbose=verbose, return_train_score=False)
 
     else:
         # Normal cross validation
         kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
-        scores = cross_validate(estimator, X_train, y_train, scoring=scoring_metrics, cv=kf, n_jobs=n_jobs,
+        scores = cross_validate(estimator, np.asarray(X_train), np.asarray(y_train), scoring=scoring_metrics, cv=kf, n_jobs=n_jobs,
                                 verbose=verbose, return_train_score=False)
 
     # Means
@@ -517,25 +517,25 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
             # Define the specific parameters for each model for each label
             if modelname[name] == "SVC":
                 model_temp = SVC(random_state=random_state)
-                model_temp.set_params(C=spec_params[name]["C"],
-                                      gamma=spec_params[name]["gamma"],
-                                      kernel=spec_params[name]["kernel"])
+                model_temp.set_params(C=spec_params[name]["svc__C"],
+                                      gamma=spec_params[name]["svc__gamma"],
+                                      kernel=spec_params[name]["svc__kernel"])
             elif modelname[name] == "RF":
                 model_temp = RandomForestClassifier(n_estimators=100, random_state=random_state)
-                model_temp.set_params(bootstrap=spec_params[name]["bootstrap"],
-                                      max_depth=spec_params[name]["max_depth"],
-                                      max_features=spec_params[name]["max_features"],
-                                      min_samples_leaf=spec_params[name]["min_samples_leaf"],
-                                      min_samples_split=spec_params[name]["min_samples_split"],
-                                      n_estimators=spec_params[name]["n_estimators"])
+                model_temp.set_params(bootstrap=spec_params[name]["randomforestclassifier__bootstrap"],
+                                      max_depth=spec_params[name]["randomforestclassifier__max_depth"],
+                                      max_features=spec_params[name]["randomforestclassifier__max_features"],
+                                      min_samples_leaf=spec_params[name]["randomforestclassifier__min_samples_leaf"],
+                                      min_samples_split=spec_params[name]["randomforestclassifier__min_samples_split"],
+                                      n_estimators=spec_params[name]["randomforestclassifier__n_estimators"])
             elif modelname[name] == "XGB":
                 model_temp = xgb.XGBClassifier(objective="binary:logistic", random_state=random_state)
-                model_temp.set_params(colsample_bytree=spec_params[name]["colsample_bytree"],
-                                      eta=spec_params[name]["eta"],
-                                      gamma=spec_params[name]["gamma"],
-                                      max_depth=spec_params[name]["max_depth"],
-                                      min_child_weight=spec_params[name]["min_child_weight"],
-                                      subsample=spec_params[name]["subsample"])
+                model_temp.set_params(colsample_bytree=spec_params[name]["xgbclassifier__colsample_bytree"],
+                                      eta=spec_params[name]["xgbclassifier__eta"],
+                                      gamma=spec_params[name]["xgbclassifier__gamma"],
+                                      max_depth=spec_params[name]["xgbclassifier__max_depth"],
+                                      min_child_weight=spec_params[name]["xgbclassifier__min_child_weight"],
+                                      subsample=spec_params[name]["xgbclassifier__subsample"])
             else:
                 print("Please specify used model (SVC, RF, XGB)")
                 return None

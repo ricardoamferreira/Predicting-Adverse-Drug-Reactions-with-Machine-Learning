@@ -15,6 +15,7 @@ import xgboost as xgb
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from imblearn.pipeline import make_pipeline
+from pprint import pprint
 
 
 def create_original_df(write=False):
@@ -379,7 +380,8 @@ def random_search(X_train, y_train, model, params_to_test, X_test=None, y_test=N
     return best_params, best_estimator
 
 
-def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_test, balancing=False, X_test=None, y_test=None,
+def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_test, balancing=False, X_test=None,
+                              y_test=None,
                               n_iter=100, n_splits=5, scoring="f1", n_jobs=-1, verbose=False, random_state=None):
     # Creates a dictionary with the best params in regards to chosen metric for each label
 
@@ -413,10 +415,10 @@ def score_report(estimator, X_test, y_test, verbose=False):
     y_true, y_pred = y_test, estimator.predict(X_test)
 
     # Individual metrics
-    f1 = f1_score(y_true, y_pred, average="macro")
-    auc = roc_auc_score(y_true, y_pred, average="macro")
-    rec = recall_score(y_true, y_pred, average="macro")
-    prec = precision_score(y_true, y_pred, average="macro")
+    f1 = f1_score(y_true, y_pred, average="binary")
+    auc = roc_auc_score(y_true, y_pred)
+    rec = recall_score(y_true, y_pred, average="binary")
+    prec = precision_score(y_true, y_pred, average="binary")
     acc = accuracy_score(y_true, y_pred)
 
     # Detailed Classification report
@@ -428,15 +430,15 @@ def score_report(estimator, X_test, y_test, verbose=False):
         print("Detailed classification report:")
         print(classification_report(y_true, y_pred))
         print()
-        """
+
         print("Confusion matrix as:")
-        print(
-               #TN FP
-               #FN TP
-               )
+        print("""
+               TN FP
+               FN TP
+               """)
         print(confusion_matrix(y_true, y_pred))
         print()
-        """
+
 
         print("Individual metrics:")
         print(f"F1 score: {f1:.3f}")
@@ -450,8 +452,8 @@ def score_report(estimator, X_test, y_test, verbose=False):
 
 
 def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
-              scoring_metrics=("f1", "roc_auc", "recall", "precision", "accuracy"), random_state=None, n_jobs=-1,
-              verbose=False):
+              scoring_metrics=("f1_micro", "roc_auc", "recall", "precision", "accuracy"), random_state=None,
+              n_jobs=-1, verbose=False):
     if balancing:
         # Save index of categorical features
         cat_shape = np.full((1128,), True, dtype=bool)
@@ -463,24 +465,24 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
         # Determine stratified k folds
         kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
         # Call cross validate
-        scores = cross_validate(pipeline, np.asarray(X_train), np.asarray(y_train), scoring=scoring_metrics, cv=kf, n_jobs=n_jobs,
-                                verbose=verbose, return_train_score=False)
+        scores = cross_validate(pipeline, np.asarray(X_train), np.asarray(y_train), scoring=scoring_metrics, cv=kf,
+                                n_jobs=n_jobs, verbose=verbose, return_train_score=False)
 
     else:
         # Normal cross validation
         kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
-        scores = cross_validate(estimator, np.asarray(X_train), np.asarray(y_train), scoring=scoring_metrics, cv=kf, n_jobs=n_jobs,
-                                verbose=verbose, return_train_score=False)
+        scores = cross_validate(estimator, np.asarray(X_train), np.asarray(y_train), scoring=scoring_metrics, cv=kf,
+                                n_jobs=n_jobs, verbose=verbose, return_train_score=False)
 
     # Means
-    f1_s = np.mean(scores["test_f1"])
+    f1_s = np.mean(scores["test_f1_micro"])
     auc_s = np.mean(scores["test_roc_auc"])
     rec_s = np.mean(scores["test_recall"])
     prec_s = np.mean(scores["test_precision"])
     acc_s = np.mean(scores["test_accuracy"])
 
     # STD
-    f1_std = np.std(scores["test_f1"])
+    f1_std = np.std(scores["test_f1_micro"])
     auc_std = np.std(scores["test_roc_auc"])
     rec_std = np.std(scores["test_recall"])
     prec_std = np.std(scores["test_precision"])
@@ -505,7 +507,7 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
     # Creates a scores report dataframe for each classification label with cv
     # Initizalize the dataframe
     report = pd.DataFrame(columns=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], index=out_names)
-    scoring_metrics = ("f1", "roc_auc", "recall", "precision", "accuracy")
+    scoring_metrics = ("f1_micro", "roc_auc", "recall", "precision", "accuracy")
 
     # For each label
     for name in tqdm(out_names):
@@ -515,6 +517,8 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
         # Calculate the score for the current label using the respective dataframe
         if spec_params:
             # Define the specific parameters for each model for each label
+            print()
+            print(f"Model {modelname[name]}")
             if modelname[name] == "SVC":
                 model_temp = SVC(random_state=random_state)
                 model_temp.set_params(C=spec_params[name]["svc__C"],
@@ -546,7 +550,6 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
             scores = cv_report(model, X_train_dic[name], y_train[name], balancing=balancing, n_splits=n_splits,
                                scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose,
                                random_state=random_state)
-
         report.loc[name, "F1"] = round(float(scores["f1_score"]), 3)
         report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
         report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)
@@ -557,8 +560,7 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
 
 
 def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, model=None, modelname=None,
-                            spec_params=None,
-                            random_state=None, verbose=False):
+                            spec_params=None, balancing=False, random_state=None, verbose=False, n_jobs=-1):
     # Creates a scores report dataframe for each classification label with cv
     # Initizalize the dataframe
     report = pd.DataFrame(columns=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], index=out_names)
@@ -570,36 +572,68 @@ def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, mod
             print(f"Scores for {name}")
         # Calculate the score for the current label using the respective dataframe
         if spec_params:
+            print("spec params")
             # Define the specific parameters for each model for each label
             if modelname[name] == "SVC":
                 model_temp = SVC(random_state=random_state)
-                model_temp.set_params(C=spec_params[name]["C"],
-                                      gamma=spec_params[name]["gamma"],
-                                      kernel=spec_params[name]["kernel"])
+                model_temp.set_params(C=spec_params[name]["svc__C"],
+                                      gamma=spec_params[name]["svc__gamma"],
+                                      kernel=spec_params[name]["svc__kernel"])
             elif modelname[name] == "RF":
                 model_temp = RandomForestClassifier(n_estimators=100, random_state=random_state)
-                model_temp.set_params(bootstrap=spec_params[name]["bootstrap"],
-                                      max_depth=spec_params[name]["max_depth"],
-                                      max_features=spec_params[name]["max_features"],
-                                      min_samples_leaf=spec_params[name]["min_samples_leaf"],
-                                      min_samples_split=spec_params[name]["min_samples_split"],
-                                      n_estimators=spec_params[name]["n_estimators"])
+                model_temp.set_params(bootstrap=spec_params[name]["randomforestclassifier__bootstrap"],
+                                      max_depth=spec_params[name]["randomforestclassifier__max_depth"],
+                                      max_features=spec_params[name]["randomforestclassifier__max_features"],
+                                      min_samples_leaf=spec_params[name]["randomforestclassifier__min_samples_leaf"],
+                                      min_samples_split=spec_params[name]["randomforestclassifier__min_samples_split"],
+                                      n_estimators=spec_params[name]["randomforestclassifier__n_estimators"])
             elif modelname[name] == "XGB":
                 model_temp = xgb.XGBClassifier(objective="binary:logistic", random_state=random_state)
-                model_temp.set_params(colsample_bytree=spec_params[name]["colsample_bytree"],
-                                      eta=spec_params[name]["eta"],
-                                      gamma=spec_params[name]["gamma"],
-                                      max_depth=spec_params[name]["max_depth"],
-                                      min_child_weight=spec_params[name]["min_child_weight"],
-                                      subsample=spec_params[name]["subsample"])
+                model_temp.set_params(colsample_bytree=spec_params[name]["xgbclassifier__colsample_bytree"],
+                                      eta=spec_params[name]["xgbclassifier__eta"],
+                                      gamma=spec_params[name]["xgbclassifier__gamma"],
+                                      max_depth=spec_params[name]["xgbclassifier__max_depth"],
+                                      min_child_weight=spec_params[name]["xgbclassifier__min_child_weight"],
+                                      subsample=spec_params[name]["xgbclassifier__subsample"])
             else:
                 print("Please specify used model (SVC, RF, XGB)")
                 return None
-            model_temp.fit(X_train_dic[name], y_train[name])
-            scores = score_report(model_temp, X_test[name], y_test[name], verbose=verbose)
+
+            if balancing:
+                print("balancing")
+                # Save index of categorical features
+                cat_shape = np.full((1128,), True, dtype=bool)
+                cat_shape[-3:] = False
+                # Prepatre SMOTENC
+                smotenc = SMOTENC(categorical_features=cat_shape, random_state=random_state, n_jobs=n_jobs)
+                # Make a pipeline with the balancing and the estimator, balacing is only called when fitting
+                pipeline = make_pipeline(smotenc, model_temp)
+                # Fit and test
+                pipeline.fit(np.asarray(X_train_dic[name]), np.asarray(y_train[name]))
+                scores = score_report(pipeline, np.asarray(X_test[name]), np.asarray(y_test[name]), verbose=verbose)
+
+            else:
+                model_temp.fit(np.asarray(X_train_dic[name]), np.asarray(y_train[name]))
+                scores = score_report(model_temp, np.asarray(X_test[name]), np.asarray(y_test[name]), verbose=verbose)
+
         else:
-            model.fit(X_train_dic[name], y_train[name])
-            scores = score_report(model, X_test[name], y_test[name], verbose=verbose)
+            if balancing:
+                # Save index of categorical features
+                cat_shape = np.full((1128,), True, dtype=bool)
+                cat_shape[-3:] = False
+                # Prepatre SMOTENC
+                smotenc = SMOTENC(categorical_features=cat_shape, random_state=random_state, n_jobs=n_jobs)
+
+                # Make a pipeline with the balancing and the estimator, balacing is only called when fitting
+                pipeline = make_pipeline(smotenc, model)
+                # Fit and test
+                pipeline.fit(np.asarray(X_train_dic[name]), np.asarray(y_train[name]))
+                scores = score_report(pipeline, np.asarray(X_test[name]), np.asarray(y_test[name]), verbose=verbose)
+
+            else:
+                model.fit(np.asarray(X_train_dic[name]), np.asarray(y_train[name]))
+                scores = score_report(model, np.asarray(X_test[name]), np.asarray(y_test[name]), verbose=verbose)
+
         report.loc[name, "F1"] = round(float(scores["f1_score"]), 3)
         report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
         report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)

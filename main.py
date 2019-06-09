@@ -52,6 +52,7 @@ modelnamexgb = {name: "XGB" for name in out_names}
 
 
 # ML MODELS
+""" F1 metric will be used """
 # SVC
 print("SVC")
 print("Base SVC without balancing:")
@@ -67,13 +68,13 @@ diff_bal_svc = base_bal_svc_report - base_svc_report
 # diff_bal_svc.plot(kind="barh", y="F1")
 
 # Searching best parameters
-# params_to_test = {"svc__kernel": ["rbf"], "svc__C": [0.01, 0.1, 1, 10],
-#                   "svc__gamma": [0.001, 0.01, 0.1, 1]}
-# d_params_to_test = {name: params_to_test for name in out_names}
-# best_SVC_params_by_label = multi_label_grid_search(X_train_dic, y_train, out_names,
-#                                                    SVC(gamma="auto", random_state=seed), d_params_to_test,
-#                                                    balancing=True, n_splits=5, scoring="f1", n_jobs=-3, verbose=True,
-#                                                    random_state=seed)
+params_to_test = {"svc__kernel": ["rbf"], "svc__C": [0.01, 0.1, 1, 10],
+                  "svc__gamma": [0.001, 0.01, 0.1, 1]}
+d_params_to_test = {name: params_to_test for name in out_names}
+best_SVC_params_by_label = multi_label_grid_search(X_train_dic, y_train, out_names[15:],
+                                                   SVC(gamma="auto", random_state=seed), d_params_to_test,
+                                                   balancing=True, n_splits=5, scoring="f1_micro", n_jobs=-2,
+                                                   verbose=True, random_state=seed)
 
 print()
 print("Improved SVC with balancing:")
@@ -100,23 +101,23 @@ diff_bal_rf = base_bal_rf_report - base_rf_report
 # ax3 = diff_bal_rf.plot.barh()
 
 # Random
-# n_estimators = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
-# max_features = ["log2", "sqrt"]
-# max_depth = [50, 90, 130, 170, 210, 250]
-# min_samples_split = [2, 5, 10]
-# min_samples_leaf = [1]
-# bootstrap = [True, False]
-# rf_grid = {"randomforestclassifier__n_estimators": n_estimators,
-#            "randomforestclassifier__max_features": max_features,
-#            "randomforestclassifier__max_depth": max_depth,
-#            "randomforestclassifier__min_samples_split": min_samples_split,
-#            "randomforestclassifier__min_samples_leaf": min_samples_leaf,
-#            "randomforestclassifier__bootstrap": bootstrap}
-# rf_grid_label = {name: rf_grid for name in out_names}
-# best_RF_params_by_label_random = multi_label_random_search(X_train_dic, y_train, out_names,
-#                                                            RandomForestClassifier(random_state=seed), rf_grid_label,
-#                                                            balancing=True, n_splits=3, scoring="f1", n_jobs=-2,
-#                                                            verbose=True, random_state=seed, n_iter=150)
+n_estimators = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+max_features = ["log2", "sqrt"]
+max_depth = [50, 90, 130, 170, 210, 250]
+min_samples_split = [2, 5, 10]
+min_samples_leaf = [1, 2]
+bootstrap = [True, False]
+rf_grid = {"randomforestclassifier__n_estimators": n_estimators,
+           "randomforestclassifier__max_features": max_features,
+           "randomforestclassifier__max_depth": max_depth,
+           "randomforestclassifier__min_samples_split": min_samples_split,
+           "randomforestclassifier__min_samples_leaf": min_samples_leaf,
+           "randomforestclassifier__bootstrap": bootstrap}
+rf_grid_label = {name: rf_grid for name in out_names}
+best_RF_params_by_label_random = multi_label_random_search(X_train_dic, y_train, out_names[10:20],
+                                                           RandomForestClassifier(random_state=seed), rf_grid_label,
+                                                           balancing=True, n_splits=3, scoring="f1_micro", n_jobs=-2,
+                                                           verbose=True, random_state=seed, n_iter=150)
 
 
 print()
@@ -213,15 +214,7 @@ ax = scores_best_model.sort_values(by=["F1"]).plot(kind="barh", y=["Recall", "F1
 for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.get_x() + p.get_width(), p.get_y()),
                                  xytext=(30, 0), textcoords='offset points', horizontalalignment='right')
 
-
-
-# # Test scores for each label
-# test_scores_best_model = test_score_multi_report(train_series_dic_bal, y_dic_bal, X_test_dic, y_test, out_names,
-#                                                  modelname=best_model_by_label, spec_params=best_model_params_by_label,
-#                                                  random_state=seed, verbose=True)
-#
-# for l, df in X_test_dic.items():
-#     df.columns = np.arange(len(df.columns))
-#
-# train_series_dic_bal["Congenital, familial and genetic disorders"]
-# X_test_dic["Congenital, familial and genetic disorders"]
+# Test scores for each label
+test_scores_best_model = test_score_multi_report(X_train_dic, y_train, X_test_dic, y_test, out_names,
+                                                 modelname=best_model_by_label, spec_params=best_model_params_by_label,
+                                                 random_state=seed, verbose=True, balancing=True, n_jobs=-2)

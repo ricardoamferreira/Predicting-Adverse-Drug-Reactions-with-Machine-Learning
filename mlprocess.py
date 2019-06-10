@@ -1,21 +1,29 @@
+# Essentials
 import pandas as pd
 import numpy as np
-import create_fingerprints as cf
-import create_descriptors as cd
+
+# Plots
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+
+# Models
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+import xgboost as xgb
+
+# Misc
 from rdkit import Chem
 from sklearn.model_selection import GridSearchCV, cross_validate, RandomizedSearchCV, StratifiedKFold
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, \
     accuracy_score, roc_auc_score
-import matplotlib.pyplot as plt
+from imblearn.pipeline import make_pipeline
 from imblearn.over_sampling import SMOTENC
 from collections import Counter
-from tqdm import tqdm
-import xgboost as xgb
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
-from imblearn.pipeline import make_pipeline
-from pprint import pprint
+
+# Functions
+import create_fingerprints as cf
+import create_descriptors as cd
 
 
 def create_original_df(write=False):
@@ -438,7 +446,6 @@ def score_report(estimator, X_test, y_test, verbose=False):
                """)
         print(confusion_matrix(y_true, y_pred))
         print()
-
 
         print("Individual metrics:")
         print(f"F1 score: {f1:.3f}")

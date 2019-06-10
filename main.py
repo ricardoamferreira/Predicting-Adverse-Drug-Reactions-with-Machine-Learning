@@ -1,12 +1,11 @@
+# Misc
+from sklearn.model_selection import train_test_split
+
+# Functions
 from mlprocess import *
 from params_by_label import *
-from sklearn.model_selection import train_test_split
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
-from pprint import pprint
-import pandas as pd
-import numpy as np
-import xgboost as xgb
+
+
 
 # Fixing the seed
 seed = 6
@@ -68,13 +67,13 @@ diff_bal_svc = base_bal_svc_report - base_svc_report
 # diff_bal_svc.plot(kind="barh", y="F1")
 
 # Searching best parameters
-params_to_test = {"svc__kernel": ["rbf"], "svc__C": [0.01, 0.1, 1, 10],
-                  "svc__gamma": [0.001, 0.01, 0.1, 1]}
-d_params_to_test = {name: params_to_test for name in out_names}
-best_SVC_params_by_label = multi_label_grid_search(X_train_dic, y_train, out_names[15:],
-                                                   SVC(gamma="auto", random_state=seed), d_params_to_test,
-                                                   balancing=True, n_splits=5, scoring="f1_micro", n_jobs=-2,
-                                                   verbose=True, random_state=seed)
+# params_to_test = {"svc__kernel": ["rbf"], "svc__C": [0.01, 0.1, 1, 10],
+#                   "svc__gamma": [0.001, 0.01, 0.1, 1]}
+# d_params_to_test = {name: params_to_test for name in out_names}
+# best_SVC_params_by_label = multi_label_grid_search(X_train_dic, y_train, out_names[15:],
+#                                                    SVC(gamma="auto", random_state=seed), d_params_to_test,
+#                                                    balancing=True, n_splits=5, scoring="f1_micro", n_jobs=-2,
+#                                                    verbose=True, random_state=seed)
 
 print()
 print("Improved SVC with balancing:")
@@ -101,24 +100,23 @@ diff_bal_rf = base_bal_rf_report - base_rf_report
 # ax3 = diff_bal_rf.plot.barh()
 
 # Random
-n_estimators = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
-max_features = ["log2", "sqrt"]
-max_depth = [50, 90, 130, 170, 210, 250]
-min_samples_split = [2, 5, 10]
-min_samples_leaf = [1, 2]
-bootstrap = [True, False]
-rf_grid = {"randomforestclassifier__n_estimators": n_estimators,
-           "randomforestclassifier__max_features": max_features,
-           "randomforestclassifier__max_depth": max_depth,
-           "randomforestclassifier__min_samples_split": min_samples_split,
-           "randomforestclassifier__min_samples_leaf": min_samples_leaf,
-           "randomforestclassifier__bootstrap": bootstrap}
-rf_grid_label = {name: rf_grid for name in out_names}
-best_RF_params_by_label_random = multi_label_random_search(X_train_dic, y_train, out_names[10:20],
-                                                           RandomForestClassifier(random_state=seed), rf_grid_label,
-                                                           balancing=True, n_splits=3, scoring="f1_micro", n_jobs=-2,
-                                                           verbose=True, random_state=seed, n_iter=150)
-
+# n_estimators = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+# max_features = ["log2", "sqrt"]
+# max_depth = [50, 90, 130, 170, 210, 250]
+# min_samples_split = [2, 5, 10]
+# min_samples_leaf = [1, 2]
+# bootstrap = [True, False]
+# rf_grid = {"randomforestclassifier__n_estimators": n_estimators,
+#            "randomforestclassifier__max_features": max_features,
+#            "randomforestclassifier__max_depth": max_depth,
+#            "randomforestclassifier__min_samples_split": min_samples_split,
+#            "randomforestclassifier__min_samples_leaf": min_samples_leaf,
+#            "randomforestclassifier__bootstrap": bootstrap}
+# rf_grid_label = {name: rf_grid for name in out_names}
+# best_RF_params_by_label = multi_label_random_search(X_train_dic, y_train, out_names[20:],
+#                                                     RandomForestClassifier(random_state=seed), rf_grid_label,
+#                                                     balancing=True, n_splits=3, scoring="f1_micro", n_jobs=-2,
+#                                                     verbose=True, random_state=seed, n_iter=150)
 
 print()
 print("Improved RF with balancing:")
@@ -147,25 +145,24 @@ diff_bal_xgb = base_bal_xgb_report - base_xgb_report
 # diff_bal_xgb.plot.barh()
 
 
-# eta = [0.05, 0.1, 0.2]
-# min_child_weight = [1, 3]
-# max_depth = [3, 5, 7, 9]
-# gamma = [0, 0.1, 0.2, 0.3, 0.4]
-# subsample = [0.6, 0.7, 0.8, 0.9]
-# colsample_bytree = [0.6, 0.7, 0.8, 0.9]
-# xgb_grid = {"xgbclassifier__eta": eta,
-#             "xgbclassifier__min_child_weight": min_child_weight,
-#             "xgbclassifier__max_depth": max_depth,
-#             "xgbclassifier__gamma": gamma,
-#             "xgbclassifier__subsample": subsample,
-#             "xgbclassifier__colsample_bytree": colsample_bytree
-#             }
-#
-# xgb_grid_label = {name: xgb_grid for name in out_names}
-# best_random_xgb = multi_label_random_search(X_train_dic, y_train, out_names[20:],
-#                                             xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
-#                                             xgb_grid_label, balancing=True, n_splits=3, scoring="f1", n_jobs=-2,
-#                                             verbose=True, random_state=seed, n_iter=150)
+eta = [0.05, 0.1, 0.2]
+min_child_weight = [1, 3]
+max_depth = [3, 5, 7, 9]
+gamma = [0, 0.1, 0.2, 0.3, 0.4]
+subsample = [0.6, 0.7, 0.8, 0.9]
+colsample_bytree = [0.6, 0.7, 0.8, 0.9]
+xgb_grid = {"xgbclassifier__eta": eta,
+            "xgbclassifier__min_child_weight": min_child_weight,
+            "xgbclassifier__max_depth": max_depth,
+            "xgbclassifier__gamma": gamma,
+            "xgbclassifier__subsample": subsample,
+            "xgbclassifier__colsample_bytree": colsample_bytree
+            }
+xgb_grid_label = {name: xgb_grid for name in out_names}
+best_xgb_params_by_label = multi_label_random_search(X_train_dic, y_train, out_names[:10],
+                                            xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
+                                            xgb_grid_label, balancing=True, n_splits=3, scoring="f1_micro", n_jobs=-2,
+                                            verbose=True, random_state=seed, n_iter=150)
 
 print()
 print("Improved XGB with balancing:")

@@ -20,10 +20,13 @@ from sklearn.metrics import classification_report, confusion_matrix, precision_s
 from imblearn.pipeline import make_pipeline
 from imblearn.over_sampling import SMOTENC
 from collections import Counter
+import re, requests
 
 # Functions
 import create_fingerprints as cf
 import create_descriptors as cd
+
+
 
 
 def create_original_df(write=False):
@@ -648,3 +651,23 @@ def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, mod
         report.loc[name, "Accuracy"] = round(float(scores["acc_score"]), 3)
     report = report.apply(pd.to_numeric)
     return report
+
+
+def get_smile(cid):
+    # Trim CID
+    ct = re.sub("^CID[0]*", "", cid)
+
+    # Getting smile
+    res = requests.get(f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{ct}/property/CanonicalSMILES/txt")
+
+    # Checking for Error 400
+    try:
+        res.raise_for_status()
+    except Exception as e:
+        print(f"Problem retrieving smile for {cid}: {e}")
+
+    # If everything is ok, get smile text
+    res_t = res.text.strip("\n")
+
+    # Return smile
+    return res_t

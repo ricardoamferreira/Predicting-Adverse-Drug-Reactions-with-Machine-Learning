@@ -46,9 +46,10 @@ modelnamesvc = {name: "SVC" for name in out_names}
 modelnamerf = {name: "RF" for name in out_names}
 modelnamexgb = {name: "XGB" for name in out_names}
 modelnamevot = {name: "VotingClassifier" for name in out_names}
-# counts = y_all.sum(axis=0)
-# counts.plot(kind='bar', figsize = (14,8), title="Adverse Drug Reactions Counts")
 
+d = {"Positives": y_all.sum(axis=0), "Negatives": 1427 - y_all.sum(axis=0)}
+countsm = pd.DataFrame(data=d)
+countsm.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1500), stacked=True)
 
 # ML MODELS
 # SVC
@@ -267,24 +268,15 @@ test_scores_best_model = test_score_multi_report(X_train_dic, y_train, X_test_di
                                                  modelname=best_model_by_label, spec_params=best_model_params_by_label,
                                                  random_state=seed, verbose=True, balancing=True, n_jobs=-2)
 test_scores_best_model.sort_values(by=["F1 Binary"], ascending=False, inplace=True)
-#test_scores_best_model.to_csv("./results/test_scores_best_model.csv")
+# test_scores_best_model.to_csv("./results/test_scores_best_model.csv")
+
 
 # OFFSIDES
-oss = pd.read_csv("./datasets/offsides_socs.csv")
+# mod_off = create_offside_df(out_names=out_names, write=False)
+mod_off = pd.read_csv("./datasets/offside_socs_modified.csv")
 
-oss_df = oss[["stitch_id", "SOC"]].copy()
-oss_df = oss_df[oss_df.SOC in out_names]
-
-stitchs = oss_df.stitch_id.unique()
-sti_to_smil = {stitch: get_smile_from_cid(stitch) for stitch in tqdm(stitchs)}
-
-oss_df["smiles"] = oss_df.stitch_id.apply(get_smile)
-
-oss_df.drop("stitch_id", inplace=True, axis=1)
-oss_df.loc["SOC"]
-oss_df[out_names] = 0
-
-for name in out_names:
-    oss_df.loc[oss_df.SOC == name, name] = 1
-
-oss_df.to_csv("./datasets/offside_socs_modified.csv")
+# 1332 Rows in Total
+df_y_2 = mod_off.drop("smiles", axis=1)
+d2 = {"Positives": df_y_2.sum(axis=0), "Negatives": 1332 - df_y_2.sum(axis=0)}
+counts = pd.DataFrame(data=d2)
+counts.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1400), stacked=True)

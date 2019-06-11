@@ -701,3 +701,29 @@ def get_smile_from_cid(cid):
 
     # Return smile
     return res_t
+
+
+def create_offside_df(out_names, write=False):
+    oss = pd.read_csv("./datasets/offsides_socs.csv")
+    oss_df = oss[["stitch_id", "SOC"]].copy()
+
+    stitchs = oss_df.stitch_id.unique()
+    sti_to_smil = {stitch: get_smile_from_cid(stitch) for stitch in tqdm(stitchs)}
+
+    d = {"stitch_id": stitchs}
+    mod_off = pd.DataFrame(data=d)
+
+    mod_off["smiles"] = mod_off.stitch_id.apply(lambda x: sti_to_smil[x])
+
+    for name in out_names:
+        mod_off[name] = 0
+
+    for index, row in tqdm(oss_df.iterrows()):
+        if row["SOC"] in out_names:
+            mod_off.loc[mod_off["stitch_id"] == row["stitch_id"], row["SOC"]] = 1
+
+    mod_off.drop("stitch_id", inplace=True, axis=1)
+    if write:
+        mod_off.to_csv("./datasets/offside_socs_modified.csv", index=False)
+
+    return mod_off

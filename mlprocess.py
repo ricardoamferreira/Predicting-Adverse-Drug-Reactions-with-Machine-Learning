@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 # Models
 from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 import xgboost as xgb
 
 # Misc
@@ -424,11 +424,12 @@ def score_report(estimator, X_test, y_test, verbose=False):
     y_true, y_pred = y_test, estimator.predict(X_test)
 
     # Individual metrics
-    f1 = f1_score(y_true, y_pred, average="binary")
+    f1_micr_score = f1_score(y_true, y_pred, average="micro")
+    f1_macro_score = f1_score(y_true, y_pred, average="macro")
+    f1_s_score = f1_score(y_true, y_pred, average="binary")
     auc = roc_auc_score(y_true, y_pred)
     rec = recall_score(y_true, y_pred, average="binary")
     prec = precision_score(y_true, y_pred, average="binary")
-    acc = accuracy_score(y_true, y_pred)
 
     # Detailed Classification report
     if verbose:
@@ -449,18 +450,20 @@ def score_report(estimator, X_test, y_test, verbose=False):
         print()
 
         print("Individual metrics:")
-        print(f"F1 score: {f1:.3f}")
+        print(f"F1 Micro score: {f1_micr_score:.3f}")
+        print(f"F1 Macro score: {f1_macro_score:.3f}")
+        print(f"F1 Binary score: {f1_s_score:.3f}")
         print(f"ROC-AUC score: {auc:.3f}")
         print(f"Recall score: {rec:.3f}")
         print(f"Precision score: {prec:.3f}")
-        print(f"Accuracy score: {acc:.3f}")
         print()
 
-        return {"f1_score": f1, "auc_score": auc, "rec_score": rec, "prec_score": prec, "acc_score": acc}
+        return {"f1_micr_score": f1_micr_score, "auc_score": auc, "rec_score": rec, "prec_score": prec,
+                "f1_macro_score": f1_macro_score, "f1_s_score": f1_s_score, }
 
 
 def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
-              scoring_metrics=("f1_micro", "f1_macro", "roc_auc", "recall", "precision", "accuracy"),
+              scoring_metrics=("f1_micro", "f1_macro", "f1", "roc_auc", "recall", "precision"),
               random_state=None, n_jobs=-1, verbose=False):
     if balancing:
         # Save index of categorical features
@@ -485,41 +488,42 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
     # Means
     f1_s = np.mean(scores["test_f1_micro"])
     f1_ms = np.mean(scores["test_f1_macro"])
+    f1_bs = np.mean(scores["test_f1"])
     auc_s = np.mean(scores["test_roc_auc"])
     rec_s = np.mean(scores["test_recall"])
     prec_s = np.mean(scores["test_precision"])
-    acc_s = np.mean(scores["test_accuracy"])
 
     # STD
     f1_std = np.std(scores["test_f1_micro"])
     f1_mstd = np.std(scores["test_f1_macro"])
+    f1_bstd = np.std(scores["test_f1"])
     auc_std = np.std(scores["test_roc_auc"])
     rec_std = np.std(scores["test_recall"])
     prec_std = np.std(scores["test_precision"])
-    acc_std = np.std(scores["test_accuracy"])
 
     if verbose:
         print()
         print("Individual metrics")
         print(f"F1 Micro Score: Mean: {f1_s:.3f} (Std: {f1_std:.3f})")
         print(f"F1 Macro Score: Mean: {f1_ms:.3f} (Std: {f1_mstd:.3f})")
+        print(f"F1 Binary Score: Mean: {f1_bs:.3f} (Std: {f1_bstd:.3f})")
         print(f"ROC-AUC score: Mean: {auc_s:.3f} (Std: {auc_std:.3f})")
         print(f"Recall score: Mean: {rec_s:.3f} (Std: {rec_std:.3f})")
         print(f"Precision score: Mean: {prec_s:.3f} (Std: {prec_std:.3f})")
-        print(f"Accuracy score: Mean: {acc_s:.3f} (Std: {acc_std:.3f})")
         print()
 
-    return {"f1_score": f1_s, "f1_std": f1_std, "auc_score": auc_s, "auc_std": auc_std, "rec_score": rec_s,
-            "rec_std": rec_std, "prec_score": prec_s, "prec_std": prec_std, "acc_score": acc_s, "acc_std": acc_std,
-            "f1_macro_score": f1_ms, "f1_macro_std": f1_mstd}
+    return {"f1_micr_score": f1_s, "f1_micr_std": f1_std, "auc_score": auc_s, "auc_std": auc_std, "rec_score": rec_s,
+            "rec_std": rec_std, "prec_score": prec_s, "prec_std": prec_std, "f1_macro_score": f1_ms,
+            "f1_macro_std": f1_mstd, "f1_score": f1_bs, "f1_std": f1_bstd}
 
 
 def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False, modelname=None, spec_params=None,
                     random_state=None, n_splits=5, n_jobs=-1, verbose=False):
     # Creates a scores report dataframe for each classification label with cv
     # Initizalize the dataframe
-    report = pd.DataFrame(columns=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], index=out_names)
-    scoring_metrics = ("f1_micro", "f1_macro", "roc_auc", "recall", "precision", "accuracy")
+    report = pd.DataFrame(columns=["F1 Binary", "F1 Micro", "F1 Macro", "ROC_AUC", "Recall", "Precision"],
+                          index=out_names)
+    scoring_metrics = ("f1_micro", "f1_macro", "f1", "roc_auc", "recall", "precision")
 
     # For each label
     for name in tqdm(out_names):
@@ -550,6 +554,31 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
                                       max_depth=spec_params[name]["xgbclassifier__max_depth"],
                                       min_child_weight=spec_params[name]["xgbclassifier__min_child_weight"],
                                       subsample=spec_params[name]["xgbclassifier__subsample"])
+            elif modelname[name] == "VotingClassifier":
+                # Spec params must be the list of the dictionaries with the params in order (SVC - RF - XGB)
+                model_svc = SVC(random_state=random_state, probability=True)
+                model_rf = RandomForestClassifier(n_estimators=100, random_state=random_state)
+                model_xgb = xgb.XGBClassifier(objective="binary:logistic", random_state=random_state)
+
+                model_svc.set_params(C=spec_params[0][name]["svc__C"],
+                                     gamma=spec_params[0][name]["svc__gamma"],
+                                     kernel=spec_params[0][name]["svc__kernel"])
+                model_rf.set_params(bootstrap=spec_params[1][name]["randomforestclassifier__bootstrap"],
+                                    max_depth=spec_params[1][name]["randomforestclassifier__max_depth"],
+                                    max_features=spec_params[1][name]["randomforestclassifier__max_features"],
+                                    min_samples_leaf=spec_params[1][name]["randomforestclassifier__min_samples_leaf"],
+                                    min_samples_split=spec_params[1][name]["randomforestclassifier__min_samples_split"],
+                                    n_estimators=spec_params[1][name]["randomforestclassifier__n_estimators"])
+                model_xgb.set_params(colsample_bytree=spec_params[2][name]["xgbclassifier__colsample_bytree"],
+                                     eta=spec_params[2][name]["xgbclassifier__eta"],
+                                     gamma=spec_params[2][name]["xgbclassifier__gamma"],
+                                     max_depth=spec_params[2][name]["xgbclassifier__max_depth"],
+                                     min_child_weight=spec_params[2][name]["xgbclassifier__min_child_weight"],
+                                     subsample=spec_params[2][name]["xgbclassifier__subsample"])
+
+                model_temp = VotingClassifier(estimators=[("svc", model_svc), ("rf", model_rf), ("xgb", model_xgb)],
+                                              voting="soft", n_jobs=n_jobs)
+
             else:
                 print("Please specify used model (SVC, RF, XGB)")
                 return None
@@ -560,12 +589,12 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
             scores = cv_report(model, X_train_dic[name], y_train[name], balancing=balancing, n_splits=n_splits,
                                scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose,
                                random_state=random_state)
-        report.loc[name, "F1 Micro"] = round(float(scores["f1_score"]), 3)
+        report.loc[name, "F1 Micro"] = round(float(scores["f1_micr_score"]), 3)
         report.loc[name, "F1 Macro"] = round(float(scores["f1_macro_score"]), 3)
+        report.loc[name, "F1 Binary"] = round(float(scores["f1_score"]), 3)
         report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
         report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)
         report.loc[name, "Precision"] = round(float(scores["prec_score"]), 3)
-        report.loc[name, "Accuracy"] = round(float(scores["acc_score"]), 3)
     report = report.apply(pd.to_numeric)
     return report
 
@@ -574,7 +603,8 @@ def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, mod
                             spec_params=None, balancing=False, random_state=None, verbose=False, n_jobs=-1):
     # Creates a scores report dataframe for each classification label with cv
     # Initizalize the dataframe
-    report = pd.DataFrame(columns=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], index=out_names)
+    report = pd.DataFrame(columns=["F1 Binary", "F1 Micro", "F1 Macro", "ROC_AUC", "Recall", "Precision"],
+                          index=out_names)
 
     # For each label
     for name in tqdm(out_names):
@@ -583,7 +613,6 @@ def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, mod
             print(f"Scores for {name}")
         # Calculate the score for the current label using the respective dataframe
         if spec_params:
-            print("spec params")
             # Define the specific parameters for each model for each label
             if modelname[name] == "SVC":
                 model_temp = SVC(random_state=random_state)
@@ -611,7 +640,6 @@ def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, mod
                 return None
 
             if balancing:
-                print("balancing")
                 # Save index of categorical features
                 cat_shape = np.full((1128,), True, dtype=bool)
                 cat_shape[-3:] = False
@@ -645,16 +673,17 @@ def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, mod
                 model.fit(np.asarray(X_train_dic[name]), np.asarray(y_train[name]))
                 scores = score_report(model, np.asarray(X_test[name]), np.asarray(y_test[name]), verbose=verbose)
 
-        report.loc[name, "F1"] = round(float(scores["f1_score"]), 3)
+        report.loc[name, "F1 Micro"] = round(float(scores["f1_micr_score"]), 3)
+        report.loc[name, "F1 Macro"] = round(float(scores["f1_macro_score"]), 3)
+        report.loc[name, "F1 Binary"] = round(float(scores["f1_s_score"]), 3)
         report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
         report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)
         report.loc[name, "Precision"] = round(float(scores["prec_score"]), 3)
-        report.loc[name, "Accuracy"] = round(float(scores["acc_score"]), 3)
     report = report.apply(pd.to_numeric)
     return report
 
 
-def get_smile(cid):
+def get_smile_from_cid(cid):
     # Trim CID
     ct = re.sub("^CID[0]*", "", cid)
 

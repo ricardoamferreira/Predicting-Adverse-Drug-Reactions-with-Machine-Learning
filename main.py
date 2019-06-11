@@ -45,12 +45,12 @@ y_train_dic = {name: y_train[name] for name in out_names}
 modelnamesvc = {name: "SVC" for name in out_names}
 modelnamerf = {name: "RF" for name in out_names}
 modelnamexgb = {name: "XGB" for name in out_names}
+modelnamevot = {name: "VotingClassifier" for name in out_names}
 # counts = y_all.sum(axis=0)
 # counts.plot(kind='bar', figsize = (14,8), title="Adverse Drug Reactions Counts")
 
 
 # ML MODELS
-""" F1 metric will be used """
 # SVC
 print("SVC")
 print("Base SVC without balancing:")
@@ -174,10 +174,22 @@ impr_bal_xgb_report = cv_multi_report(X_train_dic, y_train, out_names, modelname
 ##xg1 = impr_bal_xgb_report.plot.barh(y=["F1","Recall"])
 # # xg2 = diff_impr_xgb.plot.barh()
 #
+# impr_bal_svc_report.to_csv("./results/cv_svc_score.csv")
+# impr_bal_rf_report.to_csv("./results/cv_rf_score.csv")
+# impr_bal_xgb_report.to_csv("./results/cv_xgb_score.csv")
 
+
+print()
+print("Voting classifier: ")
+
+impr_bal_xgb_report = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamexgb,
+                                      spec_params=best_xgb_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
+                                      verbose=True, random_state=seed)
 
 # Checking best model for each label
 # impr_bal_RF_report; impr_bal_svc_report; impr_bal_xgb_report
+
+
 f1_mi_s = {"SVC": impr_bal_svc_report["F1 Micro"],
            "RF": impr_bal_rf_report["F1 Micro"],
            "XGB": impr_bal_xgb_report["F1 Micro"]}
@@ -188,19 +200,29 @@ f1_ma_s = {"SVC": impr_bal_svc_report["F1 Macro"],
            "XGB": impr_bal_xgb_report["F1 Macro"]}
 all_f1_ma_score = pd.DataFrame(data=f1_ma_s, dtype=float)
 
+f1_b_s = {"SVC": impr_bal_svc_report["F1 Binary"],
+          "RF": impr_bal_rf_report["F1 Binary"],
+          "XGB": impr_bal_xgb_report["F1 Binary"]}
+all_b_ma_score = pd.DataFrame(data=f1_b_s, dtype=float)
+
 roc_s = {"SVC": impr_bal_svc_report["ROC_AUC"],
          "RF": impr_bal_rf_report["ROC_AUC"],
          "XGB": impr_bal_xgb_report["ROC_AUC"]}
-all_roc_score = pd.DataFrame(data=f1_s, dtype=float)
+all_roc_score = pd.DataFrame(data=roc_s, dtype=float)
 
 rec_s = {"SVC": impr_bal_svc_report["Recall"],
          "RF": impr_bal_rf_report["Recall"],
          "XGB": impr_bal_xgb_report["Recall"]}
-all_rec_score = pd.DataFrame(data=f1_s, dtype=float)
+all_rec_score = pd.DataFrame(data=rec_s, dtype=float)
+
+prec_s = {"SVC": impr_bal_svc_report["Precision"],
+          "RF": impr_bal_rf_report["Precision"],
+          "XGB": impr_bal_xgb_report["Precision"]}
+all_prec_score = pd.DataFrame(data=prec_s, dtype=float)
 
 # Creating a dictionary with Key = label, value = model name
-best_model_by_label = all_f1_score.idxmax(axis=1).to_dict()
-pprint(best_model_by_label)
+# best_model_by_label = all_f1_score.idxmax(axis=1).to_dict()
+# pprint(best_model_by_label)
 # best_SVC_params_by_label; best_rf_params_by_label_grid; best_xgb_params_by_label
 
 # Getting params for best model
@@ -215,13 +237,28 @@ for label in out_names:
         best_model_params_by_label[label] = best_xgb_params_by_label[label]
     else:
         print(f"Error {label}")
+
 # # CV scores for best model for each label
 scores_best_model = cv_multi_report(X_train_dic, y_train, out_names, modelname=best_model_by_label,
                                     spec_params=best_model_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                     verbose=True, random_state=seed)
+scores_best_model.sort_values(by=["F1 Binary"], ascending=False, inplace=True)
+scores_best_model.drop("F1 BinaryF1 Micro", axis=1, inplace=True)
+# impr_bal_xgb_report.to_csv("./results/cv_best_model_scores.csv")
 
-ax = scores_best_model.sort_values(by=["F1"]).plot(kind="barh", y=["Recall", "F1"], title="Best scores by label",
-                                                   xticks=[0.5, 0.6, 0.7, 0.8, 0.9, 1], legend="reverse", xlim=(0.5, 1))
+
+# Test score voting
+scores_voting = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamevot,
+                                spec_params=(
+                                    best_SVC_params_by_label, best_RF_params_by_label, best_xgb_params_by_label),
+                                balancing=True, n_splits=5, n_jobs=-2, verbose=True, random_state=seed)
+
+# Best model cv score graph
+ax = scores_best_model.sort_values(by=["F1 Binary"]).plot(kind="barh",
+                                                          y=["ROC_AUC", "F1 Macro", "F1 Binary"],
+                                                          title="Best scores by label",
+                                                          xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+                                                          legend="reverse", xlim=(0, 1))
 for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.get_x() + p.get_width(), p.get_y()),
                                  xytext=(30, 0), textcoords='offset points', horizontalalignment='right')
 
@@ -229,6 +266,8 @@ for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.ge
 test_scores_best_model = test_score_multi_report(X_train_dic, y_train, X_test_dic, y_test, out_names,
                                                  modelname=best_model_by_label, spec_params=best_model_params_by_label,
                                                  random_state=seed, verbose=True, balancing=True, n_jobs=-2)
+test_scores_best_model.sort_values(by=["F1 Binary"], ascending=False, inplace=True)
+#test_scores_best_model.to_csv("./results/test_scores_best_model.csv")
 
 # OFFSIDES
 oss = pd.read_csv("./datasets/offsides_socs.csv")
@@ -237,7 +276,7 @@ oss_df = oss[["stitch_id", "SOC"]].copy()
 oss_df = oss_df[oss_df.SOC in out_names]
 
 stitchs = oss_df.stitch_id.unique()
-sti_to_smil = {stitch: get_smile(stitch) for stitch in tqdm(stitchs)}
+sti_to_smil = {stitch: get_smile_from_cid(stitch) for stitch in tqdm(stitchs)}
 
 oss_df["smiles"] = oss_df.stitch_id.apply(get_smile)
 

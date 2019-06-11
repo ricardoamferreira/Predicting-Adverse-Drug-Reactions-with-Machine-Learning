@@ -1,11 +1,10 @@
 # Misc
 from sklearn.model_selection import train_test_split
+from pprint import pprint
 
 # Functions
 from mlprocess import *
 from params_by_label import *
-
-
 
 # Fixing the seed
 seed = 6
@@ -47,7 +46,7 @@ modelnamesvc = {name: "SVC" for name in out_names}
 modelnamerf = {name: "RF" for name in out_names}
 modelnamexgb = {name: "XGB" for name in out_names}
 # counts = y_all.sum(axis=0)
-# counts.plot(kind='bar', figsize = (14,8), title="Counts of Side Effects")
+# counts.plot(kind='bar', figsize = (14,8), title="Adverse Drug Reactions Counts")
 
 
 # ML MODELS
@@ -145,24 +144,24 @@ diff_bal_xgb = base_bal_xgb_report - base_xgb_report
 # diff_bal_xgb.plot.barh()
 
 
-eta = [0.05, 0.1, 0.2]
-min_child_weight = [1, 3]
-max_depth = [3, 5, 7, 9]
-gamma = [0, 0.1, 0.2, 0.3, 0.4]
-subsample = [0.6, 0.7, 0.8, 0.9]
-colsample_bytree = [0.6, 0.7, 0.8, 0.9]
-xgb_grid = {"xgbclassifier__eta": eta,
-            "xgbclassifier__min_child_weight": min_child_weight,
-            "xgbclassifier__max_depth": max_depth,
-            "xgbclassifier__gamma": gamma,
-            "xgbclassifier__subsample": subsample,
-            "xgbclassifier__colsample_bytree": colsample_bytree
-            }
-xgb_grid_label = {name: xgb_grid for name in out_names}
-best_xgb_params_by_label = multi_label_random_search(X_train_dic, y_train, out_names[:10],
-                                            xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
-                                            xgb_grid_label, balancing=True, n_splits=3, scoring="f1_micro", n_jobs=-2,
-                                            verbose=True, random_state=seed, n_iter=150)
+# eta = [0.05, 0.1, 0.2]
+# min_child_weight = [1, 3]
+# max_depth = [5, 7, 9]
+# gamma = [0, 0.1, 0.2, 0.3, 0.4]
+# subsample = [0.6, 0.7, 0.8, 0.9]
+# colsample_bytree = [0.6, 0.7, 0.8, 0.9]
+# xgb_grid = {"xgbclassifier__eta": eta,
+#             "xgbclassifier__min_child_weight": min_child_weight,
+#             "xgbclassifier__max_depth": max_depth,
+#             "xgbclassifier__gamma": gamma,
+#             "xgbclassifier__subsample": subsample,
+#             "xgbclassifier__colsample_bytree": colsample_bytree
+#             }
+# xgb_grid_label = {name: xgb_grid for name in out_names}
+# best_xgb_params_by_label = multi_label_random_search(X_train_dic, y_train, out_names[20:],
+#                                                      xgb.XGBClassifier(objective="binary:logistic", random_state=seed),
+#                                                      xgb_grid_label, balancing=True, n_splits=3, scoring="f1_micro",
+#                                                      n_jobs=-2, verbose=True, random_state=seed, n_iter=150)
 
 print()
 print("Improved XGB with balancing:")
@@ -179,10 +178,25 @@ impr_bal_xgb_report = cv_multi_report(X_train_dic, y_train, out_names, modelname
 
 # Checking best model for each label
 # impr_bal_RF_report; impr_bal_svc_report; impr_bal_xgb_report
-f1_s = {"SVC": impr_bal_svc_report["F1"],
-        "RF": impr_bal_rf_report["F1"],
-        "XGB": impr_bal_xgb_report["F1"]}
-all_f1_score = pd.DataFrame(data=f1_s, dtype=float)
+f1_mi_s = {"SVC": impr_bal_svc_report["F1 Micro"],
+           "RF": impr_bal_rf_report["F1 Micro"],
+           "XGB": impr_bal_xgb_report["F1 Micro"]}
+all_f1_mi_score = pd.DataFrame(data=f1_mi_s, dtype=float)
+
+f1_ma_s = {"SVC": impr_bal_svc_report["F1 Macro"],
+           "RF": impr_bal_rf_report["F1 Macro"],
+           "XGB": impr_bal_xgb_report["F1 Macro"]}
+all_f1_ma_score = pd.DataFrame(data=f1_ma_s, dtype=float)
+
+roc_s = {"SVC": impr_bal_svc_report["ROC_AUC"],
+         "RF": impr_bal_rf_report["ROC_AUC"],
+         "XGB": impr_bal_xgb_report["ROC_AUC"]}
+all_roc_score = pd.DataFrame(data=f1_s, dtype=float)
+
+rec_s = {"SVC": impr_bal_svc_report["Recall"],
+         "RF": impr_bal_rf_report["Recall"],
+         "XGB": impr_bal_xgb_report["Recall"]}
+all_rec_score = pd.DataFrame(data=f1_s, dtype=float)
 
 # Creating a dictionary with Key = label, value = model name
 best_model_by_label = all_f1_score.idxmax(axis=1).to_dict()
@@ -215,3 +229,23 @@ for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.ge
 test_scores_best_model = test_score_multi_report(X_train_dic, y_train, X_test_dic, y_test, out_names,
                                                  modelname=best_model_by_label, spec_params=best_model_params_by_label,
                                                  random_state=seed, verbose=True, balancing=True, n_jobs=-2)
+
+# OFFSIDES
+oss = pd.read_csv("./datasets/offsides_socs.csv")
+
+oss_df = oss[["stitch_id", "SOC"]].copy()
+oss_df = oss_df[oss_df.SOC in out_names]
+
+stitchs = oss_df.stitch_id.unique()
+sti_to_smil = {stitch: get_smile(stitch) for stitch in tqdm(stitchs)}
+
+oss_df["smiles"] = oss_df.stitch_id.apply(get_smile)
+
+oss_df.drop("stitch_id", inplace=True, axis=1)
+oss_df.loc["SOC"]
+oss_df[out_names] = 0
+
+for name in out_names:
+    oss_df.loc[oss_df.SOC == name, name] = 1
+
+oss_df.to_csv("./datasets/offside_socs_modified.csv")

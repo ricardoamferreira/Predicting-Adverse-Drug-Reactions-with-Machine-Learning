@@ -27,8 +27,6 @@ import create_fingerprints as cf
 import create_descriptors as cd
 
 
-
-
 def create_original_df(write=False):
     # Create dataframe from csv
     df = pd.read_csv("./datasets/sider.csv")
@@ -462,8 +460,8 @@ def score_report(estimator, X_test, y_test, verbose=False):
 
 
 def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
-              scoring_metrics=("f1_micro", "roc_auc", "recall", "precision", "accuracy"), random_state=None,
-              n_jobs=-1, verbose=False):
+              scoring_metrics=("f1_micro", "f1_macro", "roc_auc", "recall", "precision", "accuracy"),
+              random_state=None, n_jobs=-1, verbose=False):
     if balancing:
         # Save index of categorical features
         cat_shape = np.full((1128,), True, dtype=bool)
@@ -486,6 +484,7 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
 
     # Means
     f1_s = np.mean(scores["test_f1_micro"])
+    f1_ms = np.mean(scores["test_f1_macro"])
     auc_s = np.mean(scores["test_roc_auc"])
     rec_s = np.mean(scores["test_recall"])
     prec_s = np.mean(scores["test_precision"])
@@ -493,6 +492,7 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
 
     # STD
     f1_std = np.std(scores["test_f1_micro"])
+    f1_mstd = np.std(scores["test_f1_macro"])
     auc_std = np.std(scores["test_roc_auc"])
     rec_std = np.std(scores["test_recall"])
     prec_std = np.std(scores["test_precision"])
@@ -501,7 +501,8 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
     if verbose:
         print()
         print("Individual metrics")
-        print(f"F1 Score: Mean: {f1_s:.3f} (Std: {f1_std:.3f})")
+        print(f"F1 Micro Score: Mean: {f1_s:.3f} (Std: {f1_std:.3f})")
+        print(f"F1 Macro Score: Mean: {f1_ms:.3f} (Std: {f1_mstd:.3f})")
         print(f"ROC-AUC score: Mean: {auc_s:.3f} (Std: {auc_std:.3f})")
         print(f"Recall score: Mean: {rec_s:.3f} (Std: {rec_std:.3f})")
         print(f"Precision score: Mean: {prec_s:.3f} (Std: {prec_std:.3f})")
@@ -509,7 +510,8 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
         print()
 
     return {"f1_score": f1_s, "f1_std": f1_std, "auc_score": auc_s, "auc_std": auc_std, "rec_score": rec_s,
-            "rec_std": rec_std, "prec_score": prec_s, "prec_std": prec_std, "acc_score": acc_s, "acc_std": acc_std}
+            "rec_std": rec_std, "prec_score": prec_s, "prec_std": prec_std, "acc_score": acc_s, "acc_std": acc_std,
+            "f1_macro_score": f1_ms, "f1_macro_std": f1_mstd}
 
 
 def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False, modelname=None, spec_params=None,
@@ -517,7 +519,7 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
     # Creates a scores report dataframe for each classification label with cv
     # Initizalize the dataframe
     report = pd.DataFrame(columns=["F1", "ROC_AUC", "Recall", "Precision", "Accuracy"], index=out_names)
-    scoring_metrics = ("f1_micro", "roc_auc", "recall", "precision", "accuracy")
+    scoring_metrics = ("f1_micro", "f1_macro", "roc_auc", "recall", "precision", "accuracy")
 
     # For each label
     for name in tqdm(out_names):
@@ -527,8 +529,6 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
         # Calculate the score for the current label using the respective dataframe
         if spec_params:
             # Define the specific parameters for each model for each label
-            print()
-            print(f"Model {modelname[name]}")
             if modelname[name] == "SVC":
                 model_temp = SVC(random_state=random_state)
                 model_temp.set_params(C=spec_params[name]["svc__C"],
@@ -560,7 +560,8 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
             scores = cv_report(model, X_train_dic[name], y_train[name], balancing=balancing, n_splits=n_splits,
                                scoring_metrics=scoring_metrics, n_jobs=n_jobs, verbose=verbose,
                                random_state=random_state)
-        report.loc[name, "F1"] = round(float(scores["f1_score"]), 3)
+        report.loc[name, "F1 Micro"] = round(float(scores["f1_score"]), 3)
+        report.loc[name, "F1 Macro"] = round(float(scores["f1_macro_score"]), 3)
         report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
         report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)
         report.loc[name, "Precision"] = round(float(scores["prec_score"]), 3)

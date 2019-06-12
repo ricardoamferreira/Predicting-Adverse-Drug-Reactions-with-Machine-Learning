@@ -274,9 +274,15 @@ test_scores_best_model.sort_values(by=["F1 Binary"], ascending=False, inplace=Tr
 # OFFSIDES
 # mod_off = create_offside_df(out_names=out_names, write=False)
 mod_off = pd.read_csv("./datasets/offside_socs_modified.csv")
+df = pd.read_csv("./datasets/sider.csv")
+dups = set(mod_off.smiles).intersection(df.smiles)
+len(dups) #716 Duplicates with different information
 
 # 1332 Rows in Total
 df_y_2 = mod_off.drop("smiles", axis=1)
 d2 = {"Positives": df_y_2.sum(axis=0), "Negatives": 1332 - df_y_2.sum(axis=0)}
 counts = pd.DataFrame(data=d2)
 counts.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1400), stacked=True)
+
+
+

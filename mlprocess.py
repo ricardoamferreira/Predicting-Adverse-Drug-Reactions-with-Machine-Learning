@@ -27,9 +27,12 @@ import create_fingerprints as cf
 import create_descriptors as cd
 
 
-def create_original_df(write=False):
+def create_original_df(file = None, write=False):
     # Create dataframe from csv
-    df = pd.read_csv("./datasets/sider.csv")
+    if not file:
+        df = pd.read_csv("./datasets/sider.csv")
+    else:
+        df = file.copy()
 
     # Extract SMILES column
     df_molecules = pd.DataFrame(df["smiles"])

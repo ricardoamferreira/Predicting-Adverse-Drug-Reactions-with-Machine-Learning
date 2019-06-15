@@ -13,6 +13,7 @@ import xgboost as xgb
 
 # Misc
 from rdkit import Chem
+from sklearn.decomposition import PCA
 from sklearn.model_selection import GridSearchCV, cross_validate, RandomizedSearchCV, StratifiedKFold
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, \
@@ -476,16 +477,16 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
         # Save index of categorical features
         cat_shape = np.full((1128,), True, dtype=bool)
         cat_shape[-3:] = False
-        # Prepatre SMOTENC
+        # Prepare SMOTENC
         smotenc = SMOTENC(categorical_features=cat_shape, random_state=random_state, n_jobs=n_jobs)
         # Make a pipeline with the balancing and the estimator, balacing is only called when fitting
-        pipeline = make_pipeline(smotenc, estimator)
+        pipeline = make_pipeline(smotenc, pca, estimator)
         # Determine stratified k folds
         kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
         # Call cross validate
         scores = cross_validate(pipeline, np.asarray(X_train), np.asarray(y_train), scoring=scoring_metrics, cv=kf,
                                 n_jobs=n_jobs, verbose=verbose, return_train_score=False)
-
+    
     else:
         # Normal cross validation
         kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)

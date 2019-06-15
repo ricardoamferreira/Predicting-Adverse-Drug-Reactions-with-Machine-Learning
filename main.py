@@ -49,9 +49,10 @@ modelnamevot = {name: "VotingClassifier" for name in out_names}
 
 d = {"Positives": y_all.sum(axis=0), "Negatives": 1427 - y_all.sum(axis=0)}
 countsm = pd.DataFrame(data=d)
+df_perc = countsm/1427
 countsm.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1500), stacked=True)
-
-# ML MODELS
+df_perc.plot(kind="bar")
+"""ML PROCESS"""
 # SVC
 print("SVC")
 print("Base SVC without balancing:")
@@ -243,10 +244,13 @@ for label in out_names:
 scores_best_model = cv_multi_report(X_train_dic, y_train, out_names, modelname=best_model_by_label,
                                     spec_params=best_model_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                     verbose=True, random_state=seed)
-scores_best_model.sort_values(by=["F1 Binary"], ascending=False, inplace=True)
-scores_best_model.drop("F1 BinaryF1 Micro", axis=1, inplace=True)
-# impr_bal_xgb_report.to_csv("./results/cv_best_model_scores.csv")
+scores_best_model.sort_values(by=["F1 Micro"], ascending=False, inplace=True)
+# scores_best_model.to_csv("./results/cv_best_model_scores.csv")
 
+
+scores_best_model_pca = cv_multi_report(X_train_dic, y_train, out_names[:5], modelname=best_model_by_label,
+                                        spec_params=best_model_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
+                                        verbose=True, random_state=seed)
 
 # Test score voting
 scores_voting = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamevot,
@@ -255,11 +259,11 @@ scores_voting = cv_multi_report(X_train_dic, y_train, out_names, modelname=model
                                 balancing=True, n_splits=5, n_jobs=-2, verbose=True, random_state=seed)
 
 # Best model cv score graph
-ax = scores_best_model.sort_values(by=["F1 Binary"]).plot(kind="barh",
-                                                          y=["ROC_AUC", "F1 Macro", "F1 Binary"],
-                                                          title="Best scores by label",
-                                                          xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
-                                                          legend="reverse", xlim=(0, 1))
+ax = scores_best_model.sort_values(by=["F1 Micro"]).plot(kind="barh",
+                                                         y=["ROC_AUC", "F1 Macro", "F1 Binary"],
+                                                         title="Best scores by label",
+                                                         xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+                                                         legend="reverse", xlim=(0, 1))
 for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.get_x() + p.get_width(), p.get_y()),
                                  xytext=(30, 0), textcoords='offset points', horizontalalignment='right')
 
@@ -267,11 +271,11 @@ for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.ge
 test_scores_best_model = test_score_multi_report(X_train_dic, y_train, X_test_dic, y_test, out_names,
                                                  modelname=best_model_by_label, spec_params=best_model_params_by_label,
                                                  random_state=seed, verbose=True, balancing=True, n_jobs=-2)
-test_scores_best_model.sort_values(by=["F1 Binary"], ascending=False, inplace=True)
+test_scores_best_model.sort_values(by=["F1 Micro"], ascending=False, inplace=True)
 # test_scores_best_model.to_csv("./results/test_scores_best_model.csv")
 
 
-# OFFSIDES
+"""OFFSIDES DATASET"""
 # mod_off = create_offside_df(out_names=out_names, write=False)
 mod_off = pd.read_csv("./datasets/offside_socs_modified.csv")
 df = pd.read_csv("./datasets/sider.csv")
@@ -283,6 +287,9 @@ df_y_2 = mod_off.drop("smiles", axis=1)
 d2 = {"Positives": df_y_2.sum(axis=0), "Negatives": 1332 - df_y_2.sum(axis=0)}
 counts = pd.DataFrame(data=d2)
 counts.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1400), stacked=True)
+
+
+
 
 # Merging datasets
 df_wo_ofs = df.loc[~df["smiles"].isin(dups), :].copy()  # (711, 28)
@@ -297,6 +304,12 @@ da2 = {"Positives": df_all_y.sum(axis=0), "Negatives": 2043 - df_all_y.sum(axis=
 counts = pd.DataFrame(data=da2)
 counts.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts (SIDER + OFFSIDES)", ylim=(0, 2100),
             stacked=True)
+
+# df_perc is percentage in sider
+perc_da2 = counts/2043
+
+diff_from_sider = perc_da2-df_perc
+
 
 df_off_y, df_off_mols = create_original_df(usedf=True, file=df_all, write_s=False, write_off=False)
 df_off_mols.drop("smiles", axis=1, inplace=True)
@@ -324,4 +337,7 @@ X_off_train_dic, X_off_test_dic, selected_off_cols = create_dataframes_dic(df_of
 test_scores_sioff = test_score_multi_report(X_off_train_dic, y_off_train, X_off_test_dic, y_off_test, out_names,
                                             modelname=best_model_by_label, spec_params=best_model_params_by_label,
                                             random_state=seed, verbose=True, balancing=True, n_jobs=-2)
-test_scores_sioff.to_csv("./results/test_scores_sioff.csv")
+
+diff_offsides = test_scores_sioff - test_scores_best_model
+
+

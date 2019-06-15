@@ -12,7 +12,7 @@ np.random.seed(seed)
 
 # Creating base df_molecules, df_y with the results vectors, and df_mols_descr with the descriptors
 print("Creating Dataframes")
-y_all, df_molecules = create_original_df(write=False)
+y_all, df_molecules = create_original_df(write_s=False)
 df_molecules.drop("smiles", axis=1, inplace=True)
 todrop = ["Product issues", "Investigations", "Social circumstances"]
 y_all.drop(todrop, axis=1, inplace=True)  # No real connection with the molecule, multiple problems
@@ -276,7 +276,7 @@ test_scores_best_model.sort_values(by=["F1 Binary"], ascending=False, inplace=Tr
 mod_off = pd.read_csv("./datasets/offside_socs_modified.csv")
 df = pd.read_csv("./datasets/sider.csv")
 dups = set(mod_off.smiles).intersection(df.smiles)
-len(dups) #716 Duplicates with different information
+len(dups)  # 716 Duplicates with different information
 
 # 1332 Rows in Total
 df_y_2 = mod_off.drop("smiles", axis=1)
@@ -284,5 +284,44 @@ d2 = {"Positives": df_y_2.sum(axis=0), "Negatives": 1332 - df_y_2.sum(axis=0)}
 counts = pd.DataFrame(data=d2)
 counts.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1400), stacked=True)
 
+# Merging datasets
+df_wo_ofs = df.loc[~df["smiles"].isin(dups), :].copy()  # (711, 28)
+todrop = ["Product issues", "Investigations", "Social circumstances"]
+df_wo_ofs.drop(todrop, axis=1, inplace=True)  # No real connection with the molecule, multiple problems
+df_all = pd.concat([df_wo_ofs, mod_off], axis=0)
+df_all.shape  # (2043, 25)
 
+# New counts (SIDER + OFFSIDES)
+df_all_y = df_all.drop("smiles", axis=1)
+da2 = {"Positives": df_all_y.sum(axis=0), "Negatives": 2043 - df_all_y.sum(axis=0)}
+counts = pd.DataFrame(data=da2)
+counts.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts (SIDER + OFFSIDES)", ylim=(0, 2100),
+            stacked=True)
 
+df_off_y, df_off_mols = create_original_df(usedf=True, file=df_all, write_s=False, write_off=False)
+df_off_mols.drop("smiles", axis=1, inplace=True)
+
+df_off_mols_train, df_off_mols_test, y_off_train, y_off_test = train_test_split(df_off_mols, df_off_y, test_size=0.2,
+                                                                                random_state=seed)
+
+# Create X datasets with fingerprint length
+X_off_all, _, _, _ = createfingerprints(df_off_mols, length=1125)
+X_off_train_fp, _, _, _ = createfingerprints(df_off_mols_train, length=1125)
+X_off_test_fp, _, _, _ = createfingerprints(df_off_mols_test, length=1125)
+
+# Selects and create descriptors dataset
+df_off_desc = createdescriptors(df_off_mols)  # Create all descriptors
+
+# Splits in train and test
+df_off_desc_base_train, df_off_desc_base_test = train_test_split(df_off_desc, test_size=0.2, random_state=seed)
+
+# Creates a dictionary with key = class label and value = dataframe with fingerprint + best K descriptors for that label
+X_off_train_dic, X_off_test_dic, selected_off_cols = create_dataframes_dic(df_off_desc_base_train,
+                                                                           df_off_desc_base_test, X_off_train_fp,
+                                                                           X_off_test_fp, y_off_train, out_names,
+                                                                           score_func=f_classif, k=3)
+
+test_scores_sioff = test_score_multi_report(X_off_train_dic, y_off_train, X_off_test_dic, y_off_test, out_names,
+                                            modelname=best_model_by_label, spec_params=best_model_params_by_label,
+                                            random_state=seed, verbose=True, balancing=True, n_jobs=-2)
+test_scores_sioff.to_csv("./results/test_scores_sioff.csv")

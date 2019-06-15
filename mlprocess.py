@@ -27,9 +27,9 @@ import create_fingerprints as cf
 import create_descriptors as cd
 
 
-def create_original_df(file = None, write=False):
+def create_original_df(usedf=False, file=None, write_s=False, write_off=False):
     # Create dataframe from csv
-    if not file:
+    if not usedf:
         df = pd.read_csv("./datasets/sider.csv")
     else:
         df = file.copy()
@@ -44,9 +44,13 @@ def create_original_df(file = None, write=False):
     df_y = df.drop("smiles", axis=1)
 
     # Write to csv
-    if write:
+    if write_s:
         df_molecules.to_csv("./dataframes/df_molecules.csv")
         df_y.to_csv("./dataframes/df_y.csv")
+
+    if write_off:
+        df_molecules.to_csv("./dataframes/df_off_mols.csv")
+        df_y.to_csv("./dataframes/df_off_y.csv")
 
     return df_y, df_molecules
 

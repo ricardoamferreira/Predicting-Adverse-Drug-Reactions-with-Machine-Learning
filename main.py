@@ -47,11 +47,13 @@ modelnamerf = {name: "RF" for name in out_names}
 modelnamexgb = {name: "XGB" for name in out_names}
 modelnamevot = {name: "VotingClassifier" for name in out_names}
 
+""" Analysis """
 d = {"Positives": y_all.sum(axis=0), "Negatives": 1427 - y_all.sum(axis=0)}
 countsm = pd.DataFrame(data=d)
-df_perc = countsm/1427
+df_perc = countsm / 1427
 countsm.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1500), stacked=True)
 df_perc.plot(kind="bar")
+
 """ML PROCESS"""
 # SVC
 print("SVC")
@@ -81,7 +83,9 @@ print("Improved SVC with balancing:")
 impr_bal_svc_report = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamesvc,
                                       spec_params=best_SVC_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                       verbose=True, random_state=seed)
-diff_impr_svc = impr_bal_svc_report - base_bal_svc_report
+# impr_bal_svc_report.sort_values(by=["Average Precision"], ascending=False, inplace=True)
+# impr_bal_svc_report.to_csv("./results/impr_bal_svc_report.csv")
+# diff_impr_svc = impr_bal_svc_report - base_bal_svc_report
 # ax2 = diff_impr.plot.barh()
 
 # RF
@@ -124,8 +128,9 @@ print("Improved RF with balancing:")
 impr_bal_rf_report = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamerf,
                                      spec_params=best_RF_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                      verbose=True, random_state=seed)
-
-diff_impr_rf = impr_bal_rf_report - base_bal_rf_report
+# impr_bal_rf_report.sort_values(by=["Average Precision"], ascending=False, inplace=True)
+# impr_bal_rf_report.to_csv("./results/impr_bal_rf_report.csv")
+# diff_impr_rf = impr_bal_rf_report - base_bal_rf_report
 # ax2 = diff_impr_rf.plot.barh()
 
 
@@ -171,7 +176,8 @@ print("Improved XGB with balancing:")
 impr_bal_xgb_report = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamexgb,
                                       spec_params=best_xgb_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                       verbose=True, random_state=seed)
-
+# impr_bal_xgb_report.sort_values(by=["Average Precision"], ascending=False, inplace=True)
+# impr_bal_xgb_report.to_csv("./results/impr_bal_xgb_report.csv")
 # diff_impr_xgb = impr_bal_xgb_report - base_bal_xgb_report
 ##xg1 = impr_bal_xgb_report.plot.barh(y=["F1","Recall"])
 # # xg2 = diff_impr_xgb.plot.barh()
@@ -222,6 +228,11 @@ prec_s = {"SVC": impr_bal_svc_report["Precision"],
           "XGB": impr_bal_xgb_report["Precision"]}
 all_prec_score = pd.DataFrame(data=prec_s, dtype=float)
 
+av_prec = {"SVC": impr_bal_svc_report["Average Precision"],
+           "RF": impr_bal_rf_report["Average Precision"],
+           "XGB": impr_bal_xgb_report["Average Precision"]}
+all_av_prec = pd.DataFrame(data=av_prec, dtype=float)
+
 # Creating a dictionary with Key = label, value = model name
 # best_model_by_label = all_f1_score.idxmax(axis=1).to_dict()
 # pprint(best_model_by_label)
@@ -244,13 +255,18 @@ for label in out_names:
 scores_best_model = cv_multi_report(X_train_dic, y_train, out_names, modelname=best_model_by_label,
                                     spec_params=best_model_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                     verbose=True, random_state=seed)
-scores_best_model.sort_values(by=["F1 Micro"], ascending=False, inplace=True)
-# scores_best_model.to_csv("./results/cv_best_model_scores.csv")
+scores_best_model.sort_values(by=["Average Precision"], ascending=False, inplace=True)
+scores_best_model.to_csv("./results/cv_best_model_scores.csv")
 
-
-scores_best_model_pca = cv_multi_report(X_train_dic, y_train, out_names[:5], modelname=best_model_by_label,
-                                        spec_params=best_model_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
-                                        verbose=True, random_state=seed)
+# Best model cv score graph
+ax = scores_best_model.sort_values(by=["Average Precision"]).plot(kind="barh",
+                                                                  y=["Average Precision", "ROC_AUC"],
+                                                                  title="Best scores by label",
+                                                                  xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
+                                                                          0.9, 1],
+                                                                  legend="reverse", xlim=(0, 1))
+for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.get_x() + p.get_width(), p.get_y()),
+                                 xytext=(30, 0), textcoords='offset points', horizontalalignment='right')
 
 # Test score voting
 scores_voting = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamevot,
@@ -258,22 +274,21 @@ scores_voting = cv_multi_report(X_train_dic, y_train, out_names, modelname=model
                                     best_SVC_params_by_label, best_RF_params_by_label, best_xgb_params_by_label),
                                 balancing=True, n_splits=5, n_jobs=-2, verbose=True, random_state=seed)
 
-# Best model cv score graph
-ax = scores_best_model.sort_values(by=["F1 Micro"]).plot(kind="barh",
-                                                         y=["ROC_AUC", "F1 Macro", "F1 Binary"],
-                                                         title="Best scores by label",
-                                                         xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
-                                                         legend="reverse", xlim=(0, 1))
-for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.get_x() + p.get_width(), p.get_y()),
-                                 xytext=(30, 0), textcoords='offset points', horizontalalignment='right')
-
 # Test scores for each label
 test_scores_best_model = test_score_multi_report(X_train_dic, y_train, X_test_dic, y_test, out_names,
                                                  modelname=best_model_by_label, spec_params=best_model_params_by_label,
-                                                 random_state=seed, verbose=True, balancing=True, n_jobs=-2)
-test_scores_best_model.sort_values(by=["F1 Micro"], ascending=False, inplace=True)
-# test_scores_best_model.to_csv("./results/test_scores_best_model.csv")
+                                                 random_state=seed, verbose=True, balancing=True, n_jobs=-2, plot=True)
 
+# test_scores_best_model.sort_values(by=["Average Prec-Rec"], ascending=False, inplace=True)
+# test_scores_best_model.to_csv("./results/test_scores_best_model.csv")
+ax = test_scores_best_model.sort_values(by=["Average Prec-Rec"]).plot(kind="barh",
+                                                                      y=["Average Prec-Rec", "ROC_AUC"],
+                                                                      title="Best scores by label",
+                                                                      xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
+                                                                              0.9, 1],
+                                                                      legend="reverse", xlim=(0, 1))
+for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.get_x() + p.get_width(), p.get_y()),
+                                 xytext=(30, 0), textcoords='offset points', horizontalalignment='right')
 
 """OFFSIDES DATASET"""
 # mod_off = create_offside_df(out_names=out_names, write=False)
@@ -287,9 +302,6 @@ df_y_2 = mod_off.drop("smiles", axis=1)
 d2 = {"Positives": df_y_2.sum(axis=0), "Negatives": 1332 - df_y_2.sum(axis=0)}
 counts = pd.DataFrame(data=d2)
 counts.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1400), stacked=True)
-
-
-
 
 # Merging datasets
 df_wo_ofs = df.loc[~df["smiles"].isin(dups), :].copy()  # (711, 28)
@@ -306,10 +318,9 @@ counts.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts (S
             stacked=True)
 
 # df_perc is percentage in sider
-perc_da2 = counts/2043
+perc_da2 = counts / 2043
 
-diff_from_sider = perc_da2-df_perc
-
+diff_from_sider = perc_da2 - df_perc
 
 df_off_y, df_off_mols = create_original_df(usedf=True, file=df_all, write_s=False, write_off=False)
 df_off_mols.drop("smiles", axis=1, inplace=True)
@@ -336,8 +347,11 @@ X_off_train_dic, X_off_test_dic, selected_off_cols = create_dataframes_dic(df_of
 
 test_scores_sioff = test_score_multi_report(X_off_train_dic, y_off_train, X_off_test_dic, y_off_test, out_names,
                                             modelname=best_model_by_label, spec_params=best_model_params_by_label,
-                                            random_state=seed, verbose=True, balancing=True, n_jobs=-2)
+                                            random_state=seed, verbose=True, balancing=True, n_jobs=-2, plot=True)
+test_scores_sioff.sort_values(by=["Average Prec-Rec"], ascending=False, inplace=True)
+test_scores_sioff.to_csv("./results/test_scores_sioff.csv")
 
+# Differences after joining offsides dataset
 diff_offsides = test_scores_sioff - test_scores_best_model
-
-
+diff_offsides.sort_values(by=["Average Prec-Rec"], ascending=False, inplace=True)
+diff_offsides.to_csv("./results/diff_offsides.csv")

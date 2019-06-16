@@ -13,11 +13,10 @@ import xgboost as xgb
 
 # Misc
 from rdkit import Chem
-from sklearn.decomposition import PCA
 from sklearn.model_selection import GridSearchCV, cross_validate, RandomizedSearchCV, StratifiedKFold
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score, \
-    accuracy_score, roc_auc_score
+    roc_auc_score, precision_recall_curve, average_precision_score
 from imblearn.pipeline import make_pipeline
 from imblearn.over_sampling import SMOTENC
 from collections import Counter
@@ -398,8 +397,8 @@ def random_search(X_train, y_train, model, params_to_test, X_test=None, y_test=N
 
 
 def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_test, balancing=False, X_test=None,
-                              y_test=None,
-                              n_iter=100, n_splits=5, scoring="f1", n_jobs=-1, verbose=False, random_state=None):
+                              y_test=None, n_iter=100, n_splits=5, scoring="f1", n_jobs=-1, verbose=False,
+                              random_state=None):
     # Creates a dictionary with the best params in regards to chosen metric for each label
 
     # Creates the dictionary
@@ -427,9 +426,11 @@ def multi_label_random_search(X_train_dic, y_train, out_names, model, params_to_
     return best_params_by_label
 
 
-def score_report(estimator, X_test, y_test, verbose=False):
+def score_report(estimator, X_test, y_test, verbose=False, plot=False, name=None):
     # Predicting value
     y_true, y_pred = y_test, estimator.predict(X_test)
+    y_score = estimator.predict_proba(X_test)
+    y_score = y_score[:, 1]
 
     # Individual metrics
     f1_micr_score = f1_score(y_true, y_pred, average="micro")
@@ -438,6 +439,7 @@ def score_report(estimator, X_test, y_test, verbose=False):
     auc = roc_auc_score(y_true, y_pred)
     rec = recall_score(y_true, y_pred, average="binary")
     prec = precision_score(y_true, y_pred, average="binary")
+    average_precision = average_precision_score(y_true, y_score)
 
     # Detailed Classification report
     if verbose:
@@ -464,14 +466,35 @@ def score_report(estimator, X_test, y_test, verbose=False):
         print(f"ROC-AUC score: {auc:.3f}")
         print(f"Recall score: {rec:.3f}")
         print(f"Precision score: {prec:.3f}")
+        print(f"Average precision-recall score: {average_precision:.3f}")
         print()
 
+        if plot:
+            precision, recall, _ = precision_recall_curve(y_true, y_score)
+
+            # step_kwargs = ({'step': 'post'}
+            #                if 'step' in signature(plt.fill_between).parameters
+            #                else {})
+
+            plt.step(recall, precision, color="r", alpha=0.2, where="post")
+            plt.fill_between(recall, precision, step="post", alpha=0.2, color="#F59B00")
+
+            plt.xlabel("Recall")
+            plt.ylabel("Precision")
+            plt.ylim([0.0, 1.05])
+            plt.xlim([0.0, 1.0])
+            plt.title(f'{name} \n Precision-Recall curve: AP={average_precision:0.2f}')
+
+            plt.savefig(f"./results/{name} Precision-Recall curve.png")
+
+            plt.clf()
+
         return {"f1_micr_score": f1_micr_score, "auc_score": auc, "rec_score": rec, "prec_score": prec,
-                "f1_macro_score": f1_macro_score, "f1_s_score": f1_s_score, }
+                "f1_macro_score": f1_macro_score, "f1_s_score": f1_s_score, "prec_rec_score": average_precision}
 
 
 def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
-              scoring_metrics=("f1_micro", "f1_macro", "f1", "roc_auc", "recall", "precision"),
+              scoring_metrics = ("f1_micro", "f1_macro", "f1", "roc_auc", "recall", "precision", "average_precision"),
               random_state=None, n_jobs=-1, verbose=False):
     if balancing:
         # Save index of categorical features
@@ -480,13 +503,13 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
         # Prepare SMOTENC
         smotenc = SMOTENC(categorical_features=cat_shape, random_state=random_state, n_jobs=n_jobs)
         # Make a pipeline with the balancing and the estimator, balacing is only called when fitting
-        pipeline = make_pipeline(smotenc, pca, estimator)
+        pipeline = make_pipeline(smotenc, estimator)
         # Determine stratified k folds
         kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
         # Call cross validate
         scores = cross_validate(pipeline, np.asarray(X_train), np.asarray(y_train), scoring=scoring_metrics, cv=kf,
                                 n_jobs=n_jobs, verbose=verbose, return_train_score=False)
-    
+
     else:
         # Normal cross validation
         kf = StratifiedKFold(n_splits=n_splits, random_state=random_state)
@@ -500,6 +523,7 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
     auc_s = np.mean(scores["test_roc_auc"])
     rec_s = np.mean(scores["test_recall"])
     prec_s = np.mean(scores["test_precision"])
+    avp_s = np.mean(scores["test_average_precision"])
 
     # STD
     f1_std = np.std(scores["test_f1_micro"])
@@ -508,6 +532,7 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
     auc_std = np.std(scores["test_roc_auc"])
     rec_std = np.std(scores["test_recall"])
     prec_std = np.std(scores["test_precision"])
+    avp_std = np.std(scores["test_average_precision"])
 
     if verbose:
         print()
@@ -518,20 +543,20 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
         print(f"ROC-AUC score: Mean: {auc_s:.3f} (Std: {auc_std:.3f})")
         print(f"Recall score: Mean: {rec_s:.3f} (Std: {rec_std:.3f})")
         print(f"Precision score: Mean: {prec_s:.3f} (Std: {prec_std:.3f})")
+        print(f"Average Precision score: Mean: {avp_s:.3f} (Std: {avp_std:.3f})")
         print()
 
     return {"f1_micr_score": f1_s, "f1_micr_std": f1_std, "auc_score": auc_s, "auc_std": auc_std, "rec_score": rec_s,
             "rec_std": rec_std, "prec_score": prec_s, "prec_std": prec_std, "f1_macro_score": f1_ms,
-            "f1_macro_std": f1_mstd, "f1_score": f1_bs, "f1_std": f1_bstd}
+            "f1_macro_std": f1_mstd, "f1_score": f1_bs, "f1_std": f1_bstd, "avp_score": avp_s, "avp_std": avp_std}
 
 
 def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False, modelname=None, spec_params=None,
                     random_state=None, n_splits=5, n_jobs=-1, verbose=False):
     # Creates a scores report dataframe for each classification label with cv
     # Initizalize the dataframe
-    report = pd.DataFrame(columns=["F1 Binary", "F1 Micro", "F1 Macro", "ROC_AUC", "Recall", "Precision"],
-                          index=out_names)
-    scoring_metrics = ("f1_micro", "f1_macro", "f1", "roc_auc", "recall", "precision")
+    report = pd.DataFrame(columns=["F1 Binary", "F1 Micro", "F1 Macro", "ROC_AUC", "Recall", "Precision", "Average Precision"], index=out_names)
+    scoring_metrics = ("f1_micro", "f1_macro", "f1", "roc_auc", "recall", "precision", "average_precision")
 
     # For each label
     for name in tqdm(out_names):
@@ -542,7 +567,7 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
         if spec_params:
             # Define the specific parameters for each model for each label
             if modelname[name] == "SVC":
-                model_temp = SVC(random_state=random_state)
+                model_temp = SVC(random_state=random_state, probability=True)
                 model_temp.set_params(C=spec_params[name]["svc__C"],
                                       gamma=spec_params[name]["svc__gamma"],
                                       kernel=spec_params[name]["svc__kernel"])
@@ -603,12 +628,13 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
         report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
         report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)
         report.loc[name, "Precision"] = round(float(scores["prec_score"]), 3)
+        report.loc[name, "Average Precision"] = round(float(scores["avp_score"]), 3)
     report = report.apply(pd.to_numeric)
     return report
 
 
 def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, model=None, modelname=None,
-                            spec_params=None, balancing=False, random_state=None, verbose=False, n_jobs=-1):
+                            spec_params=None, balancing=False, random_state=None, plot=False, verbose=False, n_jobs=-1):
     # Creates a scores report dataframe for each classification label with cv
     # Initizalize the dataframe
     report = pd.DataFrame(columns=["F1 Binary", "F1 Micro", "F1 Macro", "ROC_AUC", "Recall", "Precision"],
@@ -623,7 +649,7 @@ def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, mod
         if spec_params:
             # Define the specific parameters for each model for each label
             if modelname[name] == "SVC":
-                model_temp = SVC(random_state=random_state)
+                model_temp = SVC(random_state=random_state, probability=True)
                 model_temp.set_params(C=spec_params[name]["svc__C"],
                                       gamma=spec_params[name]["svc__gamma"],
                                       kernel=spec_params[name]["svc__kernel"])
@@ -657,11 +683,13 @@ def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, mod
                 pipeline = make_pipeline(smotenc, model_temp)
                 # Fit and test
                 pipeline.fit(np.asarray(X_train_dic[name]), np.asarray(y_train[name]))
-                scores = score_report(pipeline, np.asarray(X_test[name]), np.asarray(y_test[name]), verbose=verbose)
+                scores = score_report(pipeline, np.asarray(X_test[name]), np.asarray(y_test[name]), plot=plot,
+                                      verbose=verbose, name=name)
 
             else:
                 model_temp.fit(np.asarray(X_train_dic[name]), np.asarray(y_train[name]))
-                scores = score_report(model_temp, np.asarray(X_test[name]), np.asarray(y_test[name]), verbose=verbose)
+                scores = score_report(model_temp, np.asarray(X_test[name]), np.asarray(y_test[name]), plot=plot,
+                                      verbose=verbose, name=name)
 
         else:
             if balancing:
@@ -675,11 +703,13 @@ def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, mod
                 pipeline = make_pipeline(smotenc, model)
                 # Fit and test
                 pipeline.fit(np.asarray(X_train_dic[name]), np.asarray(y_train[name]))
-                scores = score_report(pipeline, np.asarray(X_test[name]), np.asarray(y_test[name]), verbose=verbose)
+                scores = score_report(pipeline, np.asarray(X_test[name]), np.asarray(y_test[name]), plot=plot,
+                                      verbose=verbose, name=name)
 
             else:
                 model.fit(np.asarray(X_train_dic[name]), np.asarray(y_train[name]))
-                scores = score_report(model, np.asarray(X_test[name]), np.asarray(y_test[name]), verbose=verbose)
+                scores = score_report(model, np.asarray(X_test[name]), np.asarray(y_test[name]), plot=plot,
+                                      verbose=verbose, name=name)
 
         report.loc[name, "F1 Micro"] = round(float(scores["f1_micr_score"]), 3)
         report.loc[name, "F1 Macro"] = round(float(scores["f1_macro_score"]), 3)
@@ -687,6 +717,8 @@ def test_score_multi_report(X_train_dic, y_train, X_test, y_test, out_names, mod
         report.loc[name, "ROC_AUC"] = round(float(scores["auc_score"]), 3)
         report.loc[name, "Recall"] = round(float(scores["rec_score"]), 3)
         report.loc[name, "Precision"] = round(float(scores["prec_score"]), 3)
+        report.loc[name, "Average Prec-Rec"] = round(float(scores["prec_rec_score"]), 3)
+        # prec_rec_score
     report = report.apply(pd.to_numeric)
     return report
 

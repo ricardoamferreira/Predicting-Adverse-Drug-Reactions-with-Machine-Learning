@@ -10,6 +10,8 @@ from params_by_label import *
 seed = 6
 np.random.seed(seed)
 
+""" Careful when importing saved dataframes with label names as indexes -> index = True """
+
 # Creating base df_molecules, df_y with the results vectors, and df_mols_descr with the descriptors
 print("Creating Dataframes")
 y_all, df_molecules = create_original_df(write_s=False)

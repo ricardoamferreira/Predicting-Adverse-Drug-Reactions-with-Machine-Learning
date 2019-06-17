@@ -182,9 +182,6 @@ impr_bal_xgb_report = cv_multi_report(X_train_dic, y_train, out_names, modelname
 ##xg1 = impr_bal_xgb_report.plot.barh(y=["F1","Recall"])
 # # xg2 = diff_impr_xgb.plot.barh()
 #
-# impr_bal_svc_report.to_csv("./results/cv_svc_score.csv")
-# impr_bal_rf_report.to_csv("./results/cv_rf_score.csv")
-# impr_bal_xgb_report.to_csv("./results/cv_xgb_score.csv")
 
 
 print()
@@ -294,6 +291,8 @@ for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.ge
 # mod_off = create_offside_df(out_names=out_names, write=False)
 mod_off = pd.read_csv("./datasets/offside_socs_modified.csv")
 df = pd.read_csv("./datasets/sider.csv")
+todrop = ["Product issues", "Investigations", "Social circumstances"]
+df.drop(todrop, axis=1, inplace=True)
 dups = set(mod_off.smiles).intersection(df.smiles)
 len(dups)  # 716 Duplicates with different information
 
@@ -304,11 +303,36 @@ counts = pd.DataFrame(data=d2)
 counts.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1400), stacked=True)
 
 # Merging datasets
-df_wo_ofs = df.loc[~df["smiles"].isin(dups), :].copy()  # (711, 28)
-todrop = ["Product issues", "Investigations", "Social circumstances"]
-df_wo_ofs.drop(todrop, axis=1, inplace=True)  # No real connection with the molecule, multiple problems
-df_all = pd.concat([df_wo_ofs, mod_off], axis=0)
-df_all.shape  # (2043, 25)
+# doff = mod_off.loc[mod_off["smiles"].isin(dups), :].copy()
+# dsid = df.loc[df["smiles"].isin(dups), :].copy()
+#
+# doff.sort_values(by=["smiles"], inplace=True)
+# dsid.sort_values(by=["smiles"], inplace=True)
+#
+# dfd = {"smiles": list(dups)}
+# df_dups = pd.DataFrame(data=dfd)
+#
+# for name in out_names:
+#     df_dups[name] = 0
+#
+# for index, row in tqdm(doff.iterrows()):
+#     for name in out_names:
+#         if row[name] == 1:
+#             df_dups.loc[df_dups["smiles"] == row["smiles"], name] = row[name]
+#
+# for index, row in tqdm(dsid.iterrows()):
+#     for name in out_names:
+#         if row[name] == 1:
+#             df_dups.loc[df_dups["smiles"] == row["smiles"], name] = row[name]
+#
+# df_wo_ofs = df.loc[~df["smiles"].isin(dups), :].copy()  # (711, 28)
+# df_wo_sid = mod_off.loc[~mod_off["smiles"].isin(dups), :].copy()  # (711, 28)
+#
+# df_all = pd.concat([df_wo_ofs, df_wo_sid, df_dups], axis=0, sort=False)
+# df_all.shape  # (2043, 25)
+# df_all.to_csv("./dataframes/df_all.csv", index=False)
+
+df_all = pd.read_csv("./dataframes/df_all.csv")  # (2043, 25)
 
 # New counts (SIDER + OFFSIDES)
 df_all_y = df_all.drop("smiles", axis=1)
@@ -347,9 +371,10 @@ X_off_train_dic, X_off_test_dic, selected_off_cols = create_dataframes_dic(df_of
 
 test_scores_sioff = test_score_multi_report(X_off_train_dic, y_off_train, X_off_test_dic, y_off_test, out_names,
                                             modelname=best_model_by_label, spec_params=best_model_params_by_label,
-                                            random_state=seed, verbose=True, balancing=True, n_jobs=-2, plot=True)
+                                            random_state=seed, verbose=True, balancing=True, n_jobs=-3, plot=True)
 test_scores_sioff.sort_values(by=["Average Prec-Rec"], ascending=False, inplace=True)
 test_scores_sioff.to_csv("./results/test_scores_sioff.csv")
+test_scores_sioff = pd.read_csv("./results/test_scores_sioff.csv", index_col=0)
 
 # Differences after joining offsides dataset
 diff_offsides = test_scores_sioff - test_scores_best_model

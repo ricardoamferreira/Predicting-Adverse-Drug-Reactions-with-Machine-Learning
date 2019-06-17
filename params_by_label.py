@@ -372,7 +372,7 @@ best_xgb_params_by_label = {'Blood and lymphatic system disorders': {'xgbclassif
 best_model_by_label = {'Blood and lymphatic system disorders': 'RF',
                        'Cardiac disorders': 'RF',
                        'Congenital, familial and genetic disorders': 'XGB',
-                       'Ear and labyrinth disorders': 'RF',
+                       'Ear and labyrinth disorders': 'SVC',
                        'Endocrine disorders': 'XGB',
                        'Eye disorders': 'RF',
                        'Gastrointestinal disorders': 'RF',

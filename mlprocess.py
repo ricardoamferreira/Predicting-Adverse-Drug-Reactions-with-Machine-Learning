@@ -82,7 +82,7 @@ def test_fingerprint_size(df_mols, df_y, model, colname="Hepatobiliary disorders
                           max_size=2048, cv=10, makeplots=False, write=False):
     # Fingerprint length type and selection
     # Scoring metrics to use
-    scoring_metrics = ["roc_auc", "precision", "recall", "accuracy", "f1"]
+    scoring_metrics = ("f1_micro", "f1_macro", "f1", "roc_auc", "recall", "precision", "average_precision")
     sizes = np.linspace(min_size, max_size, num_sizes_to_test, dtype=int)
 
     # Create results dataframes for each metric
@@ -90,16 +90,18 @@ def test_fingerprint_size(df_mols, df_y, model, colname="Hepatobiliary disorders
     results_rocauc = np.zeros([4, len(sizes)])
     results_precision = np.zeros([4, len(sizes)])
     results_recall = np.zeros([4, len(sizes)])
-    results_accuracy = np.zeros([4, len(sizes)])
+    results_average_precision = np.zeros([4, len(sizes)])
+    results_f1_micro = np.zeros([4, len(sizes)])
+    results_f1_macro = np.zeros([4, len(sizes)])
 
     # Get test sizes
     c = 0
     # Size testing using SVC with scale gamma (1 / (n_features * X.var()))
-    for s in sizes:
+    for s in tqdm(sizes):
         # Create fingerprint with size S
         fingerprints = createfingerprints(df_mols, int(s))
         r = 0
-        for fp in fingerprints:
+        for fp in tqdm(fingerprints):
             X = fp.copy()
             # Using "Hepatobiliary disorders" as an results example since its balanced
             y = df_y[colname].copy()
@@ -113,34 +115,42 @@ def test_fingerprint_size(df_mols, df_y, model, colname="Hepatobiliary disorders
                     results_precision[r, c] = v.mean()
                 if k == "test_recall":
                     results_recall[r, c] = v.mean()
-                if k == "test_accuracy":
-                    results_accuracy[r, c] = v.mean()
+                if k == "test_average_precision":
+                    results_average_precision[r, c] = v.mean()
                 if k == "test_f1":
                     results_f1[r, c] = v.mean()
+                if k == "test_f1_micro":
+                    results_f1_micro[r, c] = v.mean()
+                if k == "test_f1_macro":
+                    results_f1_macro[r, c] = v.mean()
             r += 1
         c += 1
 
-    all_results = (results_rocauc, results_precision, results_recall, results_accuracy, results_f1)
+    all_results = (results_rocauc, results_precision, results_recall, results_average_precision, results_f1,
+                   results_f1_micro, results_f1_macro)
 
     # Create dataframe for results
     df_results_rocauc_size_SVC = pd.DataFrame(results_rocauc, columns=sizes)
     df_results_precision_size_SVC = pd.DataFrame(results_precision, columns=sizes)
     df_results_recall_size_SVC = pd.DataFrame(results_recall, columns=sizes)
-    df_results_accuracy_size_SVC = pd.DataFrame(results_accuracy, columns=sizes)
+    df_results_av_prec_size_SVC = pd.DataFrame(results_average_precision, columns=sizes)
     df_results_f1_size_SVC = pd.DataFrame(results_f1, columns=sizes)
+    df_results_f1_micro_size_SVC = pd.DataFrame(results_f1_micro, columns=sizes)
+    df_results_f1_macro_size_SVC = pd.DataFrame(results_f1_macro, columns=sizes)
 
     all_df_results = (
         df_results_rocauc_size_SVC, df_results_precision_size_SVC, df_results_recall_size_SVC,
-        df_results_accuracy_size_SVC,
-        df_results_f1_size_SVC)
+        df_results_av_prec_size_SVC, df_results_f1_size_SVC, df_results_f1_micro_size_SVC, df_results_f1_macro_size_SVC)
 
     # Save to file
     if write:
         df_results_rocauc_size_SVC.to_csv("./results/df_results_rocauc_size_SVC.csv")
         df_results_precision_size_SVC.to_csv("./results/df_results_precision_size_SVC.csv")
         df_results_recall_size_SVC.to_csv("./results/df_results_recall_size_SVC.csv")
-        df_results_accuracy_size_SVC.to_csv("./results/df_results_accuracy_size_SVC.csv")
+        df_results_av_prec_size_SVC.to_csv("./results/df_results_av_prec_size_SVC.csv")
         df_results_f1_size_SVC.to_csv("./results/df_results_f1_size_SVC.csv")
+        df_results_f1_micro_size_SVC.to_csv("./results/df_results_f1_micro_size_SVC.csv")
+        df_results_f1_macro_size_SVC.to_csv("./results/df_results_f1_macro_size_SVC.csv")
 
     if makeplots:
         fp_names = ["ECFP-4", "MACCS", "Atom Pairs", "Topological Torsion"]
@@ -494,7 +504,7 @@ def score_report(estimator, X_test, y_test, verbose=False, plot=False, name=None
 
 
 def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
-              scoring_metrics = ("f1_micro", "f1_macro", "f1", "roc_auc", "recall", "precision", "average_precision"),
+              scoring_metrics=("f1_micro", "f1_macro", "f1", "roc_auc", "recall", "precision", "average_precision"),
               random_state=None, n_jobs=-1, verbose=False):
     if balancing:
         # Save index of categorical features
@@ -555,7 +565,9 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
                     random_state=None, n_splits=5, n_jobs=-1, verbose=False):
     # Creates a scores report dataframe for each classification label with cv
     # Initizalize the dataframe
-    report = pd.DataFrame(columns=["F1 Binary", "F1 Micro", "F1 Macro", "ROC_AUC", "Recall", "Precision", "Average Precision"], index=out_names)
+    report = pd.DataFrame(
+        columns=["F1 Binary", "F1 Micro", "F1 Macro", "ROC_AUC", "Recall", "Precision", "Average Precision"],
+        index=out_names)
     scoring_metrics = ("f1_micro", "f1_macro", "f1", "roc_auc", "recall", "precision", "average_precision")
 
     # For each label

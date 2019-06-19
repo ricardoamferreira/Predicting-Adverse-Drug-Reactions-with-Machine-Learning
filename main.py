@@ -24,8 +24,7 @@ out_names = y_all.columns.tolist()  # Get class labels
 df_mols_train, df_mols_test, y_train, y_test = train_test_split(df_molecules, y_all, test_size=0.2, random_state=seed)
 
 # Fingerprint length
-# all_df_results_svc = test_fingerprint_size(df_mols_train, all_y_train, SVC(gamma="scale", random_state=seed),
-#                                            makeplots=False, write=False)
+# all_df_results_svc = test_fingerprint_size(df_mols_train, y_train, SVC(gamma="scale", random_state=seed), makeplots=True, write=True)
 # Best result with ECFP-4 at 1125 - For now this will be used to all results
 
 # Create X datasets with fingerprint length

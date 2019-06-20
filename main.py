@@ -52,7 +52,8 @@ modelnamevot = {name: "VotingClassifier" for name in out_names}
 d = {"Positives": y_all.sum(axis=0), "Negatives": 1427 - y_all.sum(axis=0)}
 countsm = pd.DataFrame(data=d)
 df_perc = countsm / 1427
-df_3filt = df_perc.loc[["Hepatobiliary disorders","Gastrointestinal disorders","Neoplasms benign, malignant and unspecified (incl cysts and polyps)"]]
+df_3filt = df_perc.loc[["Hepatobiliary disorders", "Gastrointestinal disorders",
+                        "Neoplasms benign, malignant and unspecified (incl cysts and polyps)"]]
 df_3filt.to_csv("./results/df_3filt.csv", float_format='%.3f')
 countsm.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1500), stacked=True)
 df_perc.plot(kind="bar")
@@ -193,7 +194,7 @@ print("Improved XGB with balancing:")
 impr_bal_xgb_report = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamexgb,
                                       spec_params=best_xgb_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                       verbose=True, random_state=seed)
-#impr_bal_xgb_report.to_csv("./results/impr_bal_xgb_report.csv", float_format='%.3f')
+# impr_bal_xgb_report.to_csv("./results/impr_bal_xgb_report.csv", float_format='%.3f')
 # impr_bal_xgb_report.sort_values(by=["Average Precision"], ascending=False, inplace=True)
 # impr_bal_xgb_report.to_csv("./results/impr_bal_xgb_report.csv")
 # diff_impr_xgb = impr_bal_xgb_report - base_bal_xgb_report
@@ -270,16 +271,15 @@ for label in out_names:
 scores_best_model = cv_multi_report(X_train_dic, y_train, out_names, modelname=best_model_by_label,
                                     spec_params=best_model_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                     verbose=True, random_state=seed)
-scores_best_model.sort_values(by=["Average Precision"], ascending=False, inplace=True)
-scores_best_model.to_csv("./results/cv_best_model_scores.csv")
+scores_best_model.to_csv("./results/scores_best_model.csv", float_format='%.3f')
 
 # Best model cv score graph
-ax = scores_best_model.sort_values(by=["Average Precision"]).plot(kind="barh",
-                                                                  y=["Average Precision", "ROC_AUC"],
-                                                                  title="Best scores by label",
-                                                                  xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
-                                                                          0.9, 1],
-                                                                  legend="reverse", xlim=(0, 1))
+ax = scores_best_model.plot(kind="barh",
+                            y=["Average Precision", "F1 Macro", "F1 Micro"],
+                            title="Best scores by label",
+                            xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
+                                    0.9, 1],
+                            legend="reverse", xlim=(0, 1))
 for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.get_x() + p.get_width(), p.get_y()),
                                  xytext=(30, 0), textcoords='offset points', horizontalalignment='right')
 

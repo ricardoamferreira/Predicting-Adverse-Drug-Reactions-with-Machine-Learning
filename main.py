@@ -52,6 +52,8 @@ modelnamevot = {name: "VotingClassifier" for name in out_names}
 d = {"Positives": y_all.sum(axis=0), "Negatives": 1427 - y_all.sum(axis=0)}
 countsm = pd.DataFrame(data=d)
 df_perc = countsm / 1427
+df_3filt = df_perc.loc[["Hepatobiliary disorders","Gastrointestinal disorders","Neoplasms benign, malignant and unspecified (incl cysts and polyps)"]]
+df_3filt.to_csv("./results/df_3filt.csv", float_format='%.3f')
 countsm.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1500), stacked=True)
 df_perc.plot(kind="bar")
 
@@ -61,20 +63,20 @@ print("SVC")
 print("Base SVC without balancing:")
 base_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="auto", random_state=seed), n_splits=5,
                                   n_jobs=-2, verbose=True)
-base_svc_report_sorted = base_svc_report.sort_values(by=["Average Precision"], ascending=False)
-base_svc_report.to_csv("./results/base_svc_report.csv")
+
+# base_svc_report.to_csv("./results/base_svc_report.csv")
 
 
 print()
 print("Base SVC with balancing:")
 base_bal_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="auto", random_state=seed),
                                       balancing=True, n_splits=5, n_jobs=-2, verbose=True, random_state=seed)
-base_bal_svc_report_sorted = base_bal_svc_report.sort_values(by=["Average Precision"], ascending=False)
-base_bal_svc_report.to_csv("./results/base_bal_svc_report.csv")
-diff_bal_svc = base_bal_svc_report - base_svc_report
-diff_bal_svc.to_csv("./results/diff_bal_svc.csv", float_format='%.3f')
-diff_bal_svc.plot(kind="barh", y=["Average Precision", "F1 Micro", "F1 Macro", "F1 Binary"],
-                  title="Oversampling Changes")
+
+# base_bal_svc_report.to_csv("./results/base_bal_svc_report.csv")
+# diff_bal_svc = base_bal_svc_report - base_svc_report
+# diff_bal_svc.to_csv("./results/diff_bal_svc.csv", float_format='%.3f')
+# diff_bal_svc.plot(kind="barh", y=["Average Precision", "F1 Micro", "F1 Macro", "F1 Binary"],
+#                   title="Oversampling Changes")
 
 
 # Searching best parameters
@@ -92,9 +94,11 @@ impr_bal_svc_report = cv_multi_report(X_train_dic, y_train, out_names, modelname
                                       spec_params=best_SVC_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                       verbose=True, random_state=seed)
 
-impr_bal_svc_report.to_csv("./results/impr_bal_svc_report.csv", float_format='%.3f')
-diff_impr_svc = impr_bal_svc_report - base_bal_svc_report
-diff_impr_svc.to_csv("./results/diff_impr_svc.csv", float_format='%.3f')
+# impr_bal_svc_report.to_csv("./results/impr_bal_svc_report.csv", float_format='%.3f')
+# impr_bal_svc_report = pd.read_csv("./results/impr_bal_svc_report.csv", index_col=0)
+# diff_impr_svc = impr_bal_svc_report - base_bal_svc_report
+# diff_impr_svc.to_csv("./results/diff_impr_svc.csv", float_format='%.3f')
+# diff_impr_svc = pd.read_csv("./results/diff_impr_svc.csv", index_col=0)
 # ax2 = diff_impr.plot.barh()
 
 # RF
@@ -104,13 +108,16 @@ print("Base RF without balancing:")
 base_rf_report = cv_multi_report(X_train_dic, y_train, out_names,
                                  RandomForestClassifier(n_estimators=100, random_state=seed), n_splits=5, n_jobs=-2,
                                  verbose=True)
+# base_rf_report.to_csv("./results/base_rf_report.csv", float_format='%.3f')
+
 
 print()
 print("Base RF with balancing:")
 base_bal_rf_report = cv_multi_report(X_train_dic, y_train, out_names,
                                      RandomForestClassifier(n_estimators=100, random_state=seed), balancing=True,
                                      n_splits=5, n_jobs=-2, verbose=True, random_state=seed)
-diff_bal_rf = base_bal_rf_report - base_rf_report
+# base_bal_rf_report.to_csv("./results/base_bal_rf_report.csv", float_format='%.3f')
+# diff_bal_rf = base_bal_rf_report - base_rf_report
 # ax3 = diff_bal_rf.plot.barh()
 
 # Random
@@ -137,8 +144,7 @@ print("Improved RF with balancing:")
 impr_bal_rf_report = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamerf,
                                      spec_params=best_RF_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                      verbose=True, random_state=seed)
-# impr_bal_rf_report.sort_values(by=["Average Precision"], ascending=False, inplace=True)
-# impr_bal_rf_report.to_csv("./results/impr_bal_rf_report.csv")
+impr_bal_rf_report.to_csv("./results/impr_bal_rf_report.csv", float_format='%.3f')
 # diff_impr_rf = impr_bal_rf_report - base_bal_rf_report
 # ax2 = diff_impr_rf.plot.barh()
 
@@ -150,12 +156,14 @@ print("Base XGBoost:")
 base_xgb_report = cv_multi_report(X_train_dic, y_train, out_names,
                                   xgb.XGBClassifier(objective="binary:logistic", random_state=seed), n_splits=5,
                                   n_jobs=-2, verbose=True)
+base_xgb_report.to_csv("./results/base_xgb_report.csv", float_format='%.3f')
 
 print()
 print("Base XGBoost with balancing:")
 base_bal_xgb_report = cv_multi_report(X_train_dic, y_train, out_names,
                                       xgb.XGBClassifier(objective="binary:logistic", random_state=seed), balancing=True,
                                       n_splits=5, n_jobs=-2, verbose=True, random_state=seed)
+base_bal_xgb_report.to_csv("./results/base_bal_xgb_report.csv", float_format='%.3f')
 diff_bal_xgb = base_bal_xgb_report - base_xgb_report
 # diff_bal_xgb.plot.barh()
 
@@ -185,6 +193,7 @@ print("Improved XGB with balancing:")
 impr_bal_xgb_report = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamexgb,
                                       spec_params=best_xgb_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                       verbose=True, random_state=seed)
+#impr_bal_xgb_report.to_csv("./results/impr_bal_xgb_report.csv", float_format='%.3f')
 # impr_bal_xgb_report.sort_values(by=["Average Precision"], ascending=False, inplace=True)
 # impr_bal_xgb_report.to_csv("./results/impr_bal_xgb_report.csv")
 # diff_impr_xgb = impr_bal_xgb_report - base_bal_xgb_report

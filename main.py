@@ -61,14 +61,21 @@ print("SVC")
 print("Base SVC without balancing:")
 base_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="auto", random_state=seed), n_splits=5,
                                   n_jobs=-2, verbose=True)
-# ax = base_svc_report.plot.barh(y=["F1", "Recall", "Precision"])
+base_svc_report_sorted = base_svc_report.sort_values(by=["Average Precision"], ascending=False)
+base_svc_report.to_csv("./results/base_svc_report.csv")
+
 
 print()
 print("Base SVC with balancing:")
 base_bal_svc_report = cv_multi_report(X_train_dic, y_train, out_names, SVC(gamma="auto", random_state=seed),
                                       balancing=True, n_splits=5, n_jobs=-2, verbose=True, random_state=seed)
+base_bal_svc_report_sorted = base_bal_svc_report.sort_values(by=["Average Precision"], ascending=False)
+base_bal_svc_report.to_csv("./results/base_bal_svc_report.csv")
 diff_bal_svc = base_bal_svc_report - base_svc_report
-# diff_bal_svc.plot(kind="barh", y="F1")
+diff_bal_svc.to_csv("./results/diff_bal_svc.csv", float_format='%.3f')
+diff_bal_svc.plot(kind="barh", y=["Average Precision", "F1 Micro", "F1 Macro", "F1 Binary"],
+                  title="Oversampling Changes")
+
 
 # Searching best parameters
 # params_to_test = {"svc__kernel": ["rbf"], "svc__C": [0.01, 0.1, 1, 10],
@@ -84,9 +91,10 @@ print("Improved SVC with balancing:")
 impr_bal_svc_report = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamesvc,
                                       spec_params=best_SVC_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                       verbose=True, random_state=seed)
-# impr_bal_svc_report.sort_values(by=["Average Precision"], ascending=False, inplace=True)
-# impr_bal_svc_report.to_csv("./results/impr_bal_svc_report.csv")
-# diff_impr_svc = impr_bal_svc_report - base_bal_svc_report
+
+impr_bal_svc_report.to_csv("./results/impr_bal_svc_report.csv", float_format='%.3f')
+diff_impr_svc = impr_bal_svc_report - base_bal_svc_report
+diff_impr_svc.to_csv("./results/diff_impr_svc.csv", float_format='%.3f')
 # ax2 = diff_impr.plot.barh()
 
 # RF

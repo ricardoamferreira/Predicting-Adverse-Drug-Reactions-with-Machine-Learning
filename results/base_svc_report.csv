@@ -1,0 +1,25 @@
+,F1 Binary,F1 Micro,F1 Macro,ROC_AUC,Recall,Precision,Average Precision
+Hepatobiliary disorders,0.712,0.643,0.622,0.676,0.851,0.612,0.66
+Metabolism and nutrition disorders,0.818,0.692,0.409,0.565,1.0,0.692,0.732
+Eye disorders,0.763,0.624,0.43,0.597,0.984,0.622,0.687
+Musculoskeletal and connective tissue disorders,0.815,0.687,0.407,0.648,1.0,0.687,0.802
+Gastrointestinal disorders,0.951,0.907,0.476,0.672,1.0,0.907,0.945
+Immune system disorders,0.841,0.726,0.421,0.559,1.0,0.726,0.777
+Reproductive system and breast disorders,0.609,0.608,0.608,0.652,0.611,0.608,0.625
+"Neoplasms benign, malignant and unspecified (incl cysts and polyps)",0.0,0.745,0.427,0.679,0.0,0.0,0.47
+General disorders and administration site conditions,0.953,0.91,0.476,0.603,1.0,0.91,0.938
+Endocrine disorders,0.0,0.786,0.44,0.631,0.0,0.0,0.391
+Surgical and medical procedures,0.0,0.855,0.461,0.527,0.0,0.0,0.187
+Vascular disorders,0.869,0.769,0.435,0.577,1.0,0.769,0.817
+Blood and lymphatic system disorders,0.766,0.633,0.458,0.661,0.981,0.628,0.742
+Skin and subcutaneous tissue disorders,0.962,0.927,0.481,0.593,1.0,0.927,0.949
+"Congenital, familial and genetic disorders",0.0,0.824,0.452,0.585,0.0,0.0,0.245
+Infections and infestations,0.83,0.71,0.415,0.655,1.0,0.71,0.815
+"Respiratory, thoracic and mediastinal disorders",0.856,0.748,0.428,0.558,1.0,0.748,0.793
+Psychiatric disorders,0.823,0.699,0.412,0.618,1.0,0.699,0.773
+Renal and urinary disorders,0.781,0.641,0.39,0.645,1.0,0.641,0.756
+"Pregnancy, puerperium and perinatal conditions",0.0,0.915,0.478,0.514,0.0,0.0,0.129
+Ear and labyrinth disorders,0.0,0.552,0.356,0.62,0.0,0.0,0.577
+Cardiac disorders,0.819,0.693,0.409,0.641,1.0,0.693,0.795
+Nervous system disorders,0.958,0.919,0.479,0.633,1.0,0.919,0.954
+"Injury, poisoning and procedural complications",0.799,0.665,0.399,0.568,1.0,0.665,0.73

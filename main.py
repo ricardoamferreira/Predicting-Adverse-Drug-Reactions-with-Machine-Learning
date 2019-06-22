@@ -293,15 +293,16 @@ scores_voting = cv_multi_report(X_train_dic, y_train, out_names, modelname=model
 test_scores_best_model = test_score_multi_report(X_train_dic, y_train, X_test_dic, y_test, out_names,
                                                  modelname=best_model_by_label, spec_params=best_model_params_by_label,
                                                  random_state=seed, verbose=True, balancing=True, n_jobs=-2, plot=True)
+test_scores_best_model.to_csv("./results/test_scores_best_model.csv", float_format='%.3f')
+test_scores_best_model_sorted = test_scores_best_model.sort_values(by=["F1 Binary"], ascending=False)
+test_scores_best_model_sorted.to_csv("./results/test_scores_best_model_sorted.csv", float_format='%.3f')
 
-# test_scores_best_model.sort_values(by=["Average Prec-Rec"], ascending=False, inplace=True)
-# test_scores_best_model.to_csv("./results/test_scores_best_model.csv")
-ax = test_scores_best_model.sort_values(by=["Average Prec-Rec"]).plot(kind="barh",
-                                                                      y=["Average Prec-Rec", "ROC_AUC"],
-                                                                      title="Best scores by label",
-                                                                      xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
-                                                                              0.9, 1],
-                                                                      legend="reverse", xlim=(0, 1))
+ax = test_scores_best_model_sorted.plot(kind="barh",
+                                        y=["Average Prec-Rec", "ROC_AUC"],
+                                        title="Best scores by label",
+                                        xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
+                                                0.9, 1],
+                                        legend="reverse", xlim=(0, 1))
 for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.get_x() + p.get_width(), p.get_y()),
                                  xytext=(30, 0), textcoords='offset points', horizontalalignment='right')
 
@@ -390,11 +391,11 @@ X_off_train_dic, X_off_test_dic, selected_off_cols = create_dataframes_dic(df_of
 test_scores_sioff = test_score_multi_report(X_off_train_dic, y_off_train, X_off_test_dic, y_off_test, out_names,
                                             modelname=best_model_by_label, spec_params=best_model_params_by_label,
                                             random_state=seed, verbose=True, balancing=True, n_jobs=-3, plot=True)
-test_scores_sioff.sort_values(by=["Average Prec-Rec"], ascending=False, inplace=True)
-test_scores_sioff.to_csv("./results/test_scores_sioff.csv")
-test_scores_sioff = pd.read_csv("./results/test_scores_sioff.csv", index_col=0)
+test_scores_sioff.to_csv("./results/test_scores_sioff.csv", float_format='%.3f')
+test_scores_sioff_sorted = test_scores_sioff.sort_values(by=["F1 Binary"], ascending=False)
+test_scores_sioff_sorted.to_csv("./results/test_scores_sioff_sorted.csv", float_format='%.3f')
 
 # Differences after joining offsides dataset
 diff_offsides = test_scores_sioff - test_scores_best_model
-diff_offsides.sort_values(by=["Average Prec-Rec"], ascending=False, inplace=True)
+
 diff_offsides.to_csv("./results/diff_offsides.csv")

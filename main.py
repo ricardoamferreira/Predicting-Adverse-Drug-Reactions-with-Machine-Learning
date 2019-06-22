@@ -52,8 +52,8 @@ modelnamevot = {name: "VotingClassifier" for name in out_names}
 d = {"Positives": y_all.sum(axis=0), "Negatives": 1427 - y_all.sum(axis=0)}
 countsm = pd.DataFrame(data=d)
 df_perc = countsm / 1427
-df_3filt = df_perc.loc[["Hepatobiliary disorders", "Gastrointestinal disorders",
-                        "Neoplasms benign, malignant and unspecified (incl cysts and polyps)"]]
+df_3filt = df_perc.loc[["General disorders and administration site conditions", "Hepatobiliary disorders",
+                        "Congenital, familial and genetic disorders"]]
 df_3filt.to_csv("./results/df_3filt.csv", float_format='%.3f')
 countsm.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1500), stacked=True)
 df_perc.plot(kind="bar")
@@ -296,7 +296,7 @@ test_scores_best_model = test_score_multi_report(X_train_dic, y_train, X_test_di
 test_scores_best_model.to_csv("./results/test_scores_best_model.csv", float_format='%.3f')
 test_scores_best_model_sorted = test_scores_best_model.sort_values(by=["F1 Binary"], ascending=False)
 test_scores_best_model_sorted.to_csv("./results/test_scores_best_model_sorted.csv", float_format='%.3f')
-
+#test_scores_best_model = pd.read_csv("./results/test_scores_best_model.csv", index_col=0)
 ax = test_scores_best_model_sorted.plot(kind="barh",
                                         y=["Average Prec-Rec", "ROC_AUC"],
                                         title="Best scores by label",
@@ -319,7 +319,7 @@ len(dups)  # 716 Duplicates with different information
 df_y_2 = mod_off.drop("smiles", axis=1)
 d2 = {"Positives": df_y_2.sum(axis=0), "Negatives": 1332 - df_y_2.sum(axis=0)}
 counts = pd.DataFrame(data=d2)
-counts.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1400), stacked=True)
+counts.plot(kind='bar', figsize=(14, 8), title="OFFSIDES Adverse Drug Reactions Counts", ylim=(0, 1400), stacked=True)
 
 # Merging datasets
 # doff = mod_off.loc[mod_off["smiles"].isin(dups), :].copy()
@@ -392,10 +392,11 @@ test_scores_sioff = test_score_multi_report(X_off_train_dic, y_off_train, X_off_
                                             modelname=best_model_by_label, spec_params=best_model_params_by_label,
                                             random_state=seed, verbose=True, balancing=True, n_jobs=-3, plot=True)
 test_scores_sioff.to_csv("./results/test_scores_sioff.csv", float_format='%.3f')
+#test_scores_sioff = pd.read_csv("./results/test_scores_sioff.csv", index_col=0)
 test_scores_sioff_sorted = test_scores_sioff.sort_values(by=["F1 Binary"], ascending=False)
 test_scores_sioff_sorted.to_csv("./results/test_scores_sioff_sorted.csv", float_format='%.3f')
 
 # Differences after joining offsides dataset
 diff_offsides = test_scores_sioff - test_scores_best_model
 
-diff_offsides.to_csv("./results/diff_offsides.csv")
+diff_offsides.to_csv("./results/diff_offsides.csv", float_format='%.3f')

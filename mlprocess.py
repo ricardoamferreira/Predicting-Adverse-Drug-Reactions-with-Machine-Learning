@@ -101,7 +101,7 @@ def test_fingerprint_size(df_mols, df_y, model, colname="Hepatobiliary disorders
         # Create fingerprint with size S
         fingerprints = createfingerprints(df_mols, int(s))
         r = 0
-        for fp in tqdm(fingerprints):
+        for fp in fingerprints:
             X = fp.copy()
             # Using "Hepatobiliary disorders" as an results example since its balanced
             y = df_y[colname].copy()
@@ -473,7 +473,7 @@ def score_report(estimator, X_test, y_test, verbose=False, plot=False, name=None
         print(f"F1 Micro score: {f1_micr_score:.3f}")
         print(f"F1 Macro score: {f1_macro_score:.3f}")
         print(f"F1 Binary score: {f1_s_score:.3f}")
-        print(f"ROC-AUC score: {auc:.3f}")
+        print(f"AUROC score: {auc:.3f}")
         print(f"Recall score: {rec:.3f}")
         print(f"Precision score: {prec:.3f}")
         print(f"Average precision-recall score: {average_precision:.3f}")
@@ -544,17 +544,17 @@ def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
     prec_std = np.std(scores["test_precision"])
     avp_std = np.std(scores["test_average_precision"])
 
-    if verbose:
-        print()
-        print("Individual metrics")
-        print(f"F1 Micro Score: Mean: {f1_s:.3f} (Std: {f1_std:.3f})")
-        print(f"F1 Macro Score: Mean: {f1_ms:.3f} (Std: {f1_mstd:.3f})")
-        print(f"F1 Binary Score: Mean: {f1_bs:.3f} (Std: {f1_bstd:.3f})")
-        print(f"ROC-AUC score: Mean: {auc_s:.3f} (Std: {auc_std:.3f})")
-        print(f"Recall score: Mean: {rec_s:.3f} (Std: {rec_std:.3f})")
-        print(f"Precision score: Mean: {prec_s:.3f} (Std: {prec_std:.3f})")
-        print(f"Average Precision score: Mean: {avp_s:.3f} (Std: {avp_std:.3f})")
-        print()
+
+    print()
+    print("Individual metrics")
+    print(f"F1 Micro Score: Mean: {f1_s:.3f} (Std: {f1_std:.3f})")
+    print(f"F1 Macro Score: Mean: {f1_ms:.3f} (Std: {f1_mstd:.3f})")
+    print(f"F1 Binary Score: Mean: {f1_bs:.3f} (Std: {f1_bstd:.3f})")
+    print(f"AUROC score: Mean: {auc_s:.3f} (Std: {auc_std:.3f})")
+    print(f"Recall score: Mean: {rec_s:.3f} (Std: {rec_std:.3f})")
+    print(f"Precision score: Mean: {prec_s:.3f} (Std: {prec_std:.3f})")
+    print(f"Average Precision score: Mean: {avp_s:.3f} (Std: {avp_std:.3f})")
+    print()
 
     return {"f1_micr_score": f1_s, "f1_micr_std": f1_std, "auc_score": auc_s, "auc_std": auc_std, "rec_score": rec_s,
             "rec_std": rec_std, "prec_score": prec_s, "prec_std": prec_std, "f1_macro_score": f1_ms,
@@ -572,9 +572,8 @@ def cv_multi_report(X_train_dic, y_train, out_names, model=None, balancing=False
 
     # For each label
     for name in tqdm(out_names):
-        if verbose:
-            print()
-            print(f"Scores for {name}")
+        print()
+        print(f"Scores for {name}")
         # Calculate the score for the current label using the respective dataframe
         if spec_params:
             # Define the specific parameters for each model for each label

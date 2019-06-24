@@ -25,7 +25,7 @@ df_mols_train, df_mols_test, y_train, y_test = train_test_split(df_molecules, y_
 
 # Fingerprint length
 # all_df_results_svc = test_fingerprint_size(df_mols_train, y_train, SVC(gamma="scale", random_state=seed), makeplots=True, write=True)
-# Best result with ECFP-4 at 1125 - For now this will be used to all results
+# Best result with ECFP-4 at 1125 - This will be used to all results
 
 # Create X datasets with fingerprint length
 X_all, _, _, _ = createfingerprints(df_molecules, length=1125)
@@ -52,9 +52,6 @@ modelnamevot = {name: "VotingClassifier" for name in out_names}
 d = {"Positives": y_all.sum(axis=0), "Negatives": 1427 - y_all.sum(axis=0)}
 countsm = pd.DataFrame(data=d)
 df_perc = countsm / 1427
-df_3filt = df_perc.loc[["General disorders and administration site conditions", "Hepatobiliary disorders",
-                        "Congenital, familial and genetic disorders"]]
-df_3filt.to_csv("./results/df_3filt.csv", float_format='%.3f')
 countsm.plot(kind='bar', figsize=(14, 8), title="Adverse Drug Reactions Counts", ylim=(0, 1500), stacked=True)
 df_perc.plot(kind="bar")
 

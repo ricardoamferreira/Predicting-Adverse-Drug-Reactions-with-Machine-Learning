@@ -142,7 +142,7 @@ print("Improved RF with balancing:")
 impr_bal_rf_report = cv_multi_report(X_train_dic, y_train, out_names, modelname=modelnamerf,
                                      spec_params=best_RF_params_by_label, balancing=True, n_splits=5, n_jobs=-2,
                                      verbose=True, random_state=seed)
-impr_bal_rf_report.to_csv("./results/impr_bal_rf_report.csv", float_format='%.3f')
+# impr_bal_rf_report.to_csv("./results/impr_bal_rf_report.csv", float_format='%.3f')
 # diff_impr_rf = impr_bal_rf_report - base_bal_rf_report
 # ax2 = diff_impr_rf.plot.barh()
 
@@ -150,19 +150,19 @@ impr_bal_rf_report.to_csv("./results/impr_bal_rf_report.csv", float_format='%.3f
 # XGBoost
 print()
 print("XGBoost")
-print("Base XGBoost:")
+print("Base XGB:")
 base_xgb_report = cv_multi_report(X_train_dic, y_train, out_names,
                                   xgb.XGBClassifier(objective="binary:logistic", random_state=seed), n_splits=5,
                                   n_jobs=-2, verbose=True)
-base_xgb_report.to_csv("./results/base_xgb_report.csv", float_format='%.3f')
+# base_xgb_report.to_csv("./results/base_xgb_report.csv", float_format='%.3f')
 
 print()
 print("Base XGBoost with balancing:")
 base_bal_xgb_report = cv_multi_report(X_train_dic, y_train, out_names,
                                       xgb.XGBClassifier(objective="binary:logistic", random_state=seed), balancing=True,
                                       n_splits=5, n_jobs=-2, verbose=True, random_state=seed)
-base_bal_xgb_report.to_csv("./results/base_bal_xgb_report.csv", float_format='%.3f')
-diff_bal_xgb = base_bal_xgb_report - base_xgb_report
+# base_bal_xgb_report.to_csv("./results/base_bal_xgb_report.csv", float_format='%.3f')
+# diff_bal_xgb = base_bal_xgb_report - base_xgb_report
 # diff_bal_xgb.plot.barh()
 
 
@@ -226,20 +226,10 @@ f1_b_s = {"SVC": impr_bal_svc_report["F1 Binary"],
           "XGB": impr_bal_xgb_report["F1 Binary"]}
 all_b_ma_score = pd.DataFrame(data=f1_b_s, dtype=float)
 
-roc_s = {"SVC": impr_bal_svc_report["ROC_AUC"],
-         "RF": impr_bal_rf_report["ROC_AUC"],
-         "XGB": impr_bal_xgb_report["ROC_AUC"]}
-all_roc_score = pd.DataFrame(data=roc_s, dtype=float)
-
 rec_s = {"SVC": impr_bal_svc_report["Recall"],
          "RF": impr_bal_rf_report["Recall"],
          "XGB": impr_bal_xgb_report["Recall"]}
 all_rec_score = pd.DataFrame(data=rec_s, dtype=float)
-
-prec_s = {"SVC": impr_bal_svc_report["Precision"],
-          "RF": impr_bal_rf_report["Precision"],
-          "XGB": impr_bal_xgb_report["Precision"]}
-all_prec_score = pd.DataFrame(data=prec_s, dtype=float)
 
 av_prec = {"SVC": impr_bal_svc_report["Average Precision"],
            "RF": impr_bal_rf_report["Average Precision"],
@@ -290,16 +280,15 @@ scores_voting = cv_multi_report(X_train_dic, y_train, out_names, modelname=model
 test_scores_best_model = test_score_multi_report(X_train_dic, y_train, X_test_dic, y_test, out_names,
                                                  modelname=best_model_by_label, spec_params=best_model_params_by_label,
                                                  random_state=seed, verbose=True, balancing=True, n_jobs=-2, plot=True)
-test_scores_best_model.to_csv("./results/test_scores_best_model.csv", float_format='%.3f')
+#test_scores_best_model.to_csv("./results/test_scores_best_model.csv", float_format='%.3f')
 test_scores_best_model_sorted = test_scores_best_model.sort_values(by=["F1 Binary"], ascending=False)
-test_scores_best_model_sorted.to_csv("./results/test_scores_best_model_sorted.csv", float_format='%.3f')
-#test_scores_best_model = pd.read_csv("./results/test_scores_best_model.csv", index_col=0)
+#test_scores_best_model_sorted.to_csv("./results/test_scores_best_model_sorted.csv", float_format='%.3f')
+# test_scores_best_model = pd.read_csv("./results/test_scores_best_model.csv", index_col=0)
 ax = test_scores_best_model_sorted.plot(kind="barh",
-                                        y=["Average Prec-Rec", "ROC_AUC"],
-                                        title="Best scores by label",
-                                        xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
-                                                0.9, 1],
-                                        legend="reverse", xlim=(0, 1))
+                                        y=["F1 Binary", "F1 Macro", "F1 Micro"],
+                                        title="Test scores by label",
+                                        xticks=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+                                        legend="reverse", xlim=(0, 1), figsize = (10,15))
 for p in ax.patches: ax.annotate("{:.3f}".format(round(p.get_width(), 3)), (p.get_x() + p.get_width(), p.get_y()),
                                  xytext=(30, 0), textcoords='offset points', horizontalalignment='right')
 
@@ -388,12 +377,12 @@ X_off_train_dic, X_off_test_dic, selected_off_cols = create_dataframes_dic(df_of
 test_scores_sioff = test_score_multi_report(X_off_train_dic, y_off_train, X_off_test_dic, y_off_test, out_names,
                                             modelname=best_model_by_label, spec_params=best_model_params_by_label,
                                             random_state=seed, verbose=True, balancing=True, n_jobs=-3, plot=True)
-test_scores_sioff.to_csv("./results/test_scores_sioff.csv", float_format='%.3f')
-#test_scores_sioff = pd.read_csv("./results/test_scores_sioff.csv", index_col=0)
+#test_scores_sioff.to_csv("./results/test_scores_sioff.csv", float_format='%.3f')
+# test_scores_sioff = pd.read_csv("./results/test_scores_sioff.csv", index_col=0)
 test_scores_sioff_sorted = test_scores_sioff.sort_values(by=["F1 Binary"], ascending=False)
-test_scores_sioff_sorted.to_csv("./results/test_scores_sioff_sorted.csv", float_format='%.3f')
+#test_scores_sioff_sorted.to_csv("./results/test_scores_sioff_sorted.csv", float_format='%.3f')
 
 # Differences after joining offsides dataset
 diff_offsides = test_scores_sioff - test_scores_best_model
 
-diff_offsides.to_csv("./results/diff_offsides.csv", float_format='%.3f')
+#diff_offsides.to_csv("./results/diff_offsides.csv", float_format='%.3f')

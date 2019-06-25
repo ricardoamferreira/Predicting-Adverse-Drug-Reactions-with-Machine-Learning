@@ -479,28 +479,28 @@ def score_report(estimator, X_test, y_test, verbose=False, plot=False, name=None
         print(f"Average precision-recall score: {average_precision:.3f}")
         print()
 
-        if plot:
-            precision, recall, _ = precision_recall_curve(y_true, y_score)
+    if plot:
+        precision, recall, _ = precision_recall_curve(y_true, y_score)
 
-            # step_kwargs = ({'step': 'post'}
-            #                if 'step' in signature(plt.fill_between).parameters
-            #                else {})
+        # step_kwargs = ({'step': 'post'}
+        #                if 'step' in signature(plt.fill_between).parameters
+        #                else {})
 
-            plt.step(recall, precision, color="r", alpha=0.2, where="post")
-            plt.fill_between(recall, precision, step="post", alpha=0.2, color="#F59B00")
+        plt.step(recall, precision, color="r", alpha=0.2, where="post")
+        plt.fill_between(recall, precision, step="post", alpha=0.2, color="#F59B00")
 
-            plt.xlabel("Recall")
-            plt.ylabel("Precision")
-            plt.ylim([0.0, 1.05])
-            plt.xlim([0.0, 1.0])
-            plt.title(f'{name} \n Precision-Recall curve: AP={average_precision:0.2f}')
+        plt.xlabel("Recall")
+        plt.ylabel("Precision")
+        plt.ylim([0.0, 1.05])
+        plt.xlim([0.0, 1.0])
+        plt.title(f'{name} \n Precision-Recall curve: AP={average_precision:0.2f}')
 
-            plt.savefig(f"./results/{name} Precision-Recall curve.png")
+        plt.savefig(f"./results/{name} Precision-Recall curve.png")
+        plt.clf()
 
-            plt.clf()
 
-        return {"f1_micr_score": f1_micr_score, "auc_score": auc, "rec_score": rec, "prec_score": prec,
-                "f1_macro_score": f1_macro_score, "f1_s_score": f1_s_score, "prec_rec_score": average_precision}
+    return {"f1_micr_score": f1_micr_score, "auc_score": auc, "rec_score": rec, "prec_score": prec,
+            "f1_macro_score": f1_macro_score, "f1_s_score": f1_s_score, "prec_rec_score": average_precision}
 
 
 def cv_report(estimator, X_train, y_train, balancing=False, n_splits=5,
